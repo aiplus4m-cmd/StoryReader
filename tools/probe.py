@@ -40,49 +40,39 @@ def links(soup, pat, k=15):
         if re.search(pat, a["href"]) and a["href"] not in out: out.append(a["href"])
     print("  LINKS", pat, out[:k]); return out
 
-# ---------------- TruyenFull
-r = get("https://truyenfull.vision/tim-kiem/?tukhoa=tien+nghich")
-if r:
-    s = outline(r.text, 120, ".list-truyen") ; base = r.url.split("/tim-kiem")[0]
-    ls = [l for l in links(s, r"^https?://[^/]+/[a-z0-9-]+/$") if "the-loai" not in l and "danh-sach" not in l]
-    if ls:
-        r2 = get(ls[0])
-        if r2:
-            s2 = outline(r2.text, 200, "#truyen") 
-            outline(r2.text, 60, "#list-chapter")
-            print("  total-page:", re.findall(r'id="total-page"[^>]*', r2.text))
-            ch = links(s2, r"chuong-\d+")
-            if ch:
-                r3 = get(ch[0])
-                if r3: outline(r3.text, 40, "#chapter-big-container") ; print(r3.text[r3.text.find('id="chapter-c"'):][:1500])
-            r4 = get(ls[0].rstrip("/") + "/trang-2/")
-            if r4: print(r4.url); links(BeautifulSoup(r4.text, "html.parser"), r"chuong-\d+", 3)
 
-# ---------------- VietMessenger
-for u in ["http://vietmessenger.net/", "https://vietmessenger.net/"]:
-    r = get(u)
-    if r and r.ok:
-        s = outline(r.text, 150)
-        links(s, r".", 80)
-        break
-
-# ---------------- TangThuVien
-for u in ["https://truyen.tangthuvien.vn/", "https://tangthuvien.vn/", "https://www.tangthuvien.vn/", "https://truyen.tangthuvien.net/"]:
-    r = get(u)
-    if r and r.ok:
-        links(BeautifulSoup(r.text, "html.parser"), r"doc-truyen", 10); break
-
-# ---------------- Wattpad
-for u in [
-    "https://www.wattpad.com/v4/search/stories?query=love&limit=2&fields=stories(id,title,url,user(name)),total",
-    "https://www.wattpad.com/v4/search/stories/?query=love&limit=2&mature=1&fields=stories(id,title,url,user(name)),total",
-    "https://api.wattpad.com/v4/search/stories?query=love&limit=2&fields=stories(id,title,url,user(name)),total",
-    "https://www.wattpad.com/v4/search/stories?query=t%C3%ACnh%20y%C3%AAu&limit=2&fields=stories(id,title,url,user(name),parts(id)),total",
-    "https://www.wattpad.com/api/v3/stories?query=love&limit=2&fields=stories(id,title,url)",
-    "https://www.wattpad.com/api/v3/stories/2?fields=id,title,parts(id,title,url)",
-    "https://www.wattpad.com/api/v3/stories/226474?fields=id,title,user(name),parts(id,title,url)",
-]:
+def jget(u):
     r = get(u, headers={"Accept": "application/json"})
-    if r: print("  ", r.text[:600])
-r = get("https://www.wattpad.com/search/love")
-if r: links(BeautifulSoup(r.text, "html.parser"), r"/story/", 5); print(re.findall(r'api[^"\']{0,80}search[^"\']{0,120}', r.text)[:10])
+    if r: print("  ", r.text[:1500])
+    return r
+
+# Wattpad detail + text
+r = jget("https://www.wattpad.com/api/v3/stories/297837644?fields=id,title,description,cover,url,user(name),parts(id,title,url)")
+try:
+    pid = r.json()["parts"][0]["id"]
+    t = get(f"https://www.wattpad.com/apiv2/storytext?id={pid}"); print(t.text[:800] if t else "")
+except Exception as e: print("ERR", e)
+jget("https://www.wattpad.com/v4/search/stories?query=love&limit=2&offset=0&fields=stories(id,title,cover,description,user(name),numParts,url),total")
+
+# TruyenFull: big story pagination + content length
+r = get("https://truyenfull.live/tien-nghich/")
+if r:
+    print("  total-page:", re.findall(r'id="total-page"[^>]*', r.text)); print("  pagination:", re.findall(r'href="([^"]*trang-\d+[^"]*)"', r.text)[:8])
+r = get("https://truyenfull.live/tien-nghich/trang-3/")
+if r: print("  ", re.findall(r'href="([^"]*chuong-\d+/)"', r.text)[:4])
+r = get("https://truyenfull.live/tien-nghich/chuong-1/")
+if r:
+    soup = BeautifulSoup(r.text, "html.parser"); c = soup.select_one("#chapter-c")
+    print("  content len", len(c.get_text()) if c else None, (c.get_text()[-300:] if c else ""))
+
+# Candidates
+for u in ["https://vietnamthuquan.eu/", "http://vietnamthuquan.eu/truyen/", "https://wetruyen.com/", "https://sstruyen.vn/", "https://truyenyy.mobi/",
+          "https://metruyencv.com/", "https://backend.metruyencv.com/api/books/search?keyword=tien", "https://doctruyen.vip/", "https://truyenchu.com.vn/",
+          "https://www.doctruyen.org/", "https://truyenhdt.com/", "https://truyen.com/", "https://dtruyen.club/", "https://truyenmoi.com/", "https://doctruyen.io/"]:
+    r = get(u)
+    if r is not None and r.ok:
+        soup = BeautifulSoup(r.text, "html.parser")
+        print("  TITLE", soup.title.string if soup.title else None)
+        forms = [(f.get("action"), [i.get("name") for i in f.find_all("input")]) for f in soup.find_all("form")]
+        print("  FORMS", forms[:4])
+        links(soup, r".", 25)
