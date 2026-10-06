@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [ "ccr-*" ]
-    paths: [ ".github/workflows/probe.yml", "tools/probe.sh" ]
+    paths: [ ".github/workflows/probe.yml", "tools/**" ]
 jobs:
   probe:
     runs-on: ubuntu-latest
