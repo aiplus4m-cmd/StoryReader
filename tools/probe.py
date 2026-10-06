@@ -41,38 +41,43 @@ def links(soup, pat, k=15):
     print("  LINKS", pat, out[:k]); return out
 
 
-def jget(u):
-    r = get(u, headers={"Accept": "application/json"})
-    if r: print("  ", r.text[:1500])
-    return r
 
-# Wattpad detail + text
-r = jget("https://www.wattpad.com/api/v3/stories/297837644?fields=id,title,description,cover,url,user(name),parts(id,title,url)")
-try:
-    pid = r.json()["parts"][0]["id"]
-    t = get(f"https://www.wattpad.com/apiv2/storytext?id={pid}"); print(t.text[:800] if t else "")
-except Exception as e: print("ERR", e)
-jget("https://www.wattpad.com/v4/search/stories?query=love&limit=2&offset=0&fields=stories(id,title,cover,description,user(name),numParts,url),total")
-
-# TruyenFull: big story pagination + content length
-r = get("https://truyenfull.live/tien-nghich/")
+import json
+# ---------- DTruyen
+r = get("https://dtruyen.club/?s=tien+nghich")
 if r:
-    print("  total-page:", re.findall(r'id="total-page"[^>]*', r.text)); print("  pagination:", re.findall(r'href="([^"]*trang-\d+[^"]*)"', r.text)[:8])
-r = get("https://truyenfull.live/tien-nghich/trang-3/")
-if r: print("  ", re.findall(r'href="([^"]*chuong-\d+/)"', r.text)[:4])
-r = get("https://truyenfull.live/tien-nghich/chuong-1/")
+    s = outline(r.text, 120, "main") or None
+    ls = [l for l in links(BeautifulSoup(r.text, "html.parser"), r"dtruyen\.club/[^/]+/$", 40) if "the-loai" not in l]
+    print("STORY CAND", ls[:10])
+for l in (ls if r else [])[:0]: pass
+def first_story(r, host):
+    soup = BeautifulSoup(r.text, "html.parser")
+    for a in soup.select("h3 a, h2 a, .title a, a[title]"):
+        h = a.get("href", "")
+        if host in h and "the-loai" not in h and h.rstrip("/").count("/") == 3: return h
+r2 = None
 if r:
-    soup = BeautifulSoup(r.text, "html.parser"); c = soup.select_one("#chapter-c")
-    print("  content len", len(c.get_text()) if c else None, (c.get_text()[-300:] if c else ""))
+    u = first_story(r, "dtruyen.club"); print("FIRST", u)
+    if u:
+        r2 = get(u)
+        if r2:
+            outline(r2.text, 220, "main")
+            ch = links(BeautifulSoup(r2.text, "html.parser"), r"chuong", 6)
+            print("  AJAX:", re.findall(r'(admin-ajax[^"\']*|action[\'"]?\s*[:=]\s*[\'"][a-z_]+)', r2.text)[:10])
+            print("  INPUTS:", re.findall(r'<input[^>]+>', r2.text)[:10])
+            if ch:
+                r3 = get(ch[0])
+                if r3: outline(r3.text, 60, "main")
 
-# Candidates
-for u in ["https://vietnamthuquan.eu/", "http://vietnamthuquan.eu/truyen/", "https://wetruyen.com/", "https://sstruyen.vn/", "https://truyenyy.mobi/",
-          "https://metruyencv.com/", "https://backend.metruyencv.com/api/books/search?keyword=tien", "https://doctruyen.vip/", "https://truyenchu.com.vn/",
-          "https://www.doctruyen.org/", "https://truyenhdt.com/", "https://truyen.com/", "https://dtruyen.club/", "https://truyenmoi.com/", "https://doctruyen.io/"]:
+# ---------- VietNamThuQuan
+for u in ["https://vietnamthuquan.eu/truyen/timkiem?chu=tat+den", "https://vietnamthuquan.eu/Truyen/TimKiem?chu=tat+den", "https://vietnamthuquan.eu/?chu=tat+den"]:
     r = get(u)
-    if r is not None and r.ok:
+    if r and r.ok:
         soup = BeautifulSoup(r.text, "html.parser")
-        print("  TITLE", soup.title.string if soup.title else None)
-        forms = [(f.get("action"), [i.get("name") for i in f.find_all("input")]) for f in soup.find_all("form")]
-        print("  FORMS", forms[:4])
-        links(soup, r".", 25)
+        tp = links(soup, r"/TacPham/", 10)
+        if tp: break
+print("  scripts:", re.findall(r'<script[^>]*src="([^"]+)"', r.text)[:10] if r else None)
+r = get("https://vietnamthuquan.eu/TacPham/noi-buon-chien-tranh-3530/")
+if r:
+    outline(r.text, 250)
+    print("  JS snippets:", re.findall(r'.{0,120}(?:ajax|\$\.post|fetch\(|chuong|noidung).{0,160}', r.text, re.I)[:15])
