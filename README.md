@@ -23,10 +23,11 @@
 |---|---|---|
 | Wattpad | https://www.wattpad.com | API công khai của Wattpad |
 | TruyenFull | https://truyenfull.live | Đọc trang HTML công khai |
-| Project Gutenberg | https://www.gutenberg.org | API Gutendex (sách phạm vi công cộng) |
+| Việt Nam Thư Quán | https://vietnamthuquan.eu | Đọc trang HTML công khai |
+| Project Gutenberg | https://www.gutenberg.org | Trang tìm kiếm & bản text công khai (sách phạm vi công cộng) |
 
-> VietMessenger (vietmessenger.net) hiện chỉ còn trang "coming soon" và TàngThưViện không truy cập được
-> tại thời điểm phát triển, nên chưa được tích hợp. Có thể bổ sung nguồn mới bằng cách triển khai
+> VietMessenger (vietmessenger.net) hiện chỉ còn trang "coming soon", TàngThưViện không truy cập được và
+> DTruyen chặn tìm kiếm tự động tại thời điểm phát triển, nên chưa được tích hợp. Có thể bổ sung nguồn mới bằng cách triển khai
 > interface `StorySource` (`app/src/main/java/net/topvl/storyreader/source/`).
 
 ## Miễn trừ trách nhiệm

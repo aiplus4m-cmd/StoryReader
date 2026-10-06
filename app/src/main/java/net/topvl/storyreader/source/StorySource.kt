@@ -24,6 +24,7 @@ object Sources {
     val all: List<StorySource> = listOf(
         WattpadSource,
         TruyenFullSource,
+        VietNamThuQuanSource,
         GutenbergSource,
     )
 

@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import net.topvl.storyreader.source.GutenbergSource
 import net.topvl.storyreader.source.StorySource
 import net.topvl.storyreader.source.TruyenFullSource
+import net.topvl.storyreader.source.VietNamThuQuanSource
 import net.topvl.storyreader.source.WattpadSource
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,5 +33,6 @@ class SourcesLiveTest {
 
     @Test fun wattpad() = check(WattpadSource, "tình yêu")
     @Test fun truyenfull() = check(TruyenFullSource, "tien nghich")
+    @Test fun vntq() = check(VietNamThuQuanSource, "tắt đèn")
     @Test fun gutenberg() = check(GutenbergSource, "sherlock")
 }
