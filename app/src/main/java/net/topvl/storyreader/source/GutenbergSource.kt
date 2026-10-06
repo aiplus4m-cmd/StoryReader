@@ -1,38 +1,28 @@
 package net.topvl.storyreader.source
 
-import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
-/** Project Gutenberg (qua API công khai Gutendex) - sách phạm vi công cộng. */
+/** Project Gutenberg  - sách phạm vi công cộng. */
 object GutenbergSource : StorySource {
     override val id = "gutenberg"
     override val name = "Project Gutenberg"
     override val homepage = "https://www.gutenberg.org"
     override val language = "đa ngôn ngữ"
 
-    private const val API = "https://gutendex.com/books/"
     private val textCache = ConcurrentHashMap<String, List<ChapterContent>>()
 
     override suspend fun search(query: String, page: Int): List<Story> {
-        val json = JSONObject(Http.get("$API?search=${query.urlEncode()}&page=$page"))
-        val arr = json.optJSONArray("results") ?: return emptyList()
-        return (0 until arr.length()).map { i ->
-            val o = arr.getJSONObject(i)
-            val bookId = o.optInt("id")
-            val authors = o.optJSONArray("authors")
-            val author = if (authors == null) "" else
-                (0 until authors.length()).joinToString(", ") { authors.getJSONObject(it).optString("name") }
-            val formats = o.optJSONObject("formats")
+        val startIndex = (page - 1) * 25 + 1
+        val doc = Http.doc("$homepage/ebooks/search/?query=${query.urlEncode()}&start_index=$startIndex")
+        return doc.select("li.booklink").mapNotNull { li ->
+            val a = li.selectFirst("a.link") ?: return@mapNotNull null
+            val id = Regex("""/ebooks/(\d+)""").find(a.attr("href"))?.groupValues?.get(1) ?: return@mapNotNull null
             Story(
-                sourceId = id,
-                url = "https://www.gutenberg.org/ebooks/$bookId",
-                title = o.optString("title"),
-                author = author,
-                cover = formats?.optString("image/jpeg").orEmpty(),
-                description = buildString {
-                    val subjects = o.optJSONArray("subjects")
-                    if (subjects != null) append((0 until subjects.length()).joinToString("; ") { subjects.getString(it) })
-                },
+                sourceId = this.id,
+                url = "$homepage/ebooks/$id",
+                title = li.selectFirst(".title")?.text().orEmpty(),
+                author = li.selectFirst(".subtitle")?.text().orEmpty(),
+                cover = li.selectFirst("img")?.absUrl("src").orEmpty(),
             )
         }
     }

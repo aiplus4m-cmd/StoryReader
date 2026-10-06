@@ -52,22 +52,32 @@ object TruyenFullSource : StorySource {
                 .forEach { chapters += it.await() }
         }
 
-        val desc = doc.selectFirst(".desc-text")?.toReadableText().orEmpty()
+        val desc = doc.selectFirst(".desc-text")?.toReadableText()?.let(::stripSpam).orEmpty()
+        val title = doc.selectFirst("h3.title")?.text()?.ifBlank { null } ?: story.title
         StoryDetail(
             story = story.copy(
-                title = doc.selectFirst("h3.title")?.text()?.ifBlank { null } ?: story.title,
+                title = title,
                 author = doc.select("a[itemprop=author]").joinToString(", ") { it.text() }.ifBlank { story.author },
                 cover = doc.selectFirst(".book img")?.absUrl("src")?.ifBlank { null } ?: story.cover,
                 description = desc.ifBlank { story.description },
             ),
-            chapters = chapters.distinctBy { it.url },
+            chapters = chapters.distinctBy { it.url }.map { it.copy(title = it.title.removePrefix("$title - ").trim()) },
         )
     }
+
+    /** Bỏ các dòng chèn quảng cáo/từ khoá của trang nguồn. */
+    private fun stripSpam(text: String): String =
+        text.lines().filterNot { line ->
+            val l = line.lowercase()
+            line.length < 120 && (l.contains("truyenfull") || l.contains("truyen full"))
+        }.joinToString("\n").trim()
 
     override suspend fun chapter(chapter: Chapter): ChapterContent {
         val doc = Http.doc(chapter.url)
         val content = doc.selectFirst("#chapter-c") ?: throw IllegalStateException("Không đọc được nội dung chương")
-        val title = doc.selectFirst("a.chapter-title")?.let { it.toChapter().title } ?: chapter.title
-        return ChapterContent(title, content.toReadableText())
+        val storyTitle = doc.selectFirst("a.truyen-title")?.text().orEmpty()
+        val title = (doc.selectFirst("a.chapter-title")?.let { it.toChapter().title } ?: chapter.title)
+            .removePrefix("$storyTitle - ").trim()
+        return ChapterContent(title, stripSpam(content.toReadableText()))
     }
 }
