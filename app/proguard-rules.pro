@@ -4,3 +4,4 @@
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
 -keep class org.jsoup.** { *; }
+-dontwarn com.google.re2j.**
