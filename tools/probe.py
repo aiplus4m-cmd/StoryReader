@@ -42,42 +42,39 @@ def links(soup, pat, k=15):
 
 
 
-import json
-# ---------- DTruyen
-r = get("https://dtruyen.club/?s=tien+nghich")
-if r:
-    s = outline(r.text, 120, "main") or None
-    ls = [l for l in links(BeautifulSoup(r.text, "html.parser"), r"dtruyen\.club/[^/]+/$", 40) if "the-loai" not in l]
-    print("STORY CAND", ls[:10])
-for l in (ls if r else [])[:0]: pass
-def first_story(r, host):
-    soup = BeautifulSoup(r.text, "html.parser")
-    for a in soup.select("h3 a, h2 a, .title a, a[title]"):
-        h = a.get("href", "")
-        if host in h and "the-loai" not in h and h.rstrip("/").count("/") == 3: return h
-r2 = None
-if r:
-    u = first_story(r, "dtruyen.club"); print("FIRST", u)
-    if u:
-        r2 = get(u)
-        if r2:
-            outline(r2.text, 220, "main")
-            ch = links(BeautifulSoup(r2.text, "html.parser"), r"chuong", 6)
-            print("  AJAX:", re.findall(r'(admin-ajax[^"\']*|action[\'"]?\s*[:=]\s*[\'"][a-z_]+)', r2.text)[:10])
-            print("  INPUTS:", re.findall(r'<input[^>]+>', r2.text)[:10])
-            if ch:
-                r3 = get(ch[0])
-                if r3: outline(r3.text, 60, "main")
 
-# ---------- VietNamThuQuan
-for u in ["https://vietnamthuquan.eu/truyen/timkiem?chu=tat+den", "https://vietnamthuquan.eu/Truyen/TimKiem?chu=tat+den", "https://vietnamthuquan.eu/?chu=tat+den"]:
-    r = get(u)
-    if r and r.ok:
-        soup = BeautifulSoup(r.text, "html.parser")
-        tp = links(soup, r"/TacPham/", 10)
-        if tp: break
-print("  scripts:", re.findall(r'<script[^>]*src="([^"]+)"', r.text)[:10] if r else None)
+r = get("https://vietnamthuquan.eu/truyen/timkiem?chu=tat+den")
+if r:
+    soup = BeautifulSoup(r.text, "html.parser")
+    a = soup.find("a", href=re.compile("/TacPham/tat-den-1959/"))
+    p = a
+    for _ in range(4):
+        if p.parent: p = p.parent
+    print("SEARCH ITEM CONTEXT:", str(p)[:2500])
 r = get("https://vietnamthuquan.eu/TacPham/noi-buon-chien-tranh-3530/")
 if r:
-    outline(r.text, 250)
-    print("  JS snippets:", re.findall(r'.{0,120}(?:ajax|\$\.post|fetch\(|chuong|noidung).{0,160}', r.text, re.I)[:15])
+    i = r.text.find("MODAL"); print("MODAL:", r.text[i:i+3000])
+    print("chuong links:", sorted(set(re.findall(r'/TacPham/noi-buon-chien-tranh-3530/chuong-\d+', r.text)))[:20])
+    for k in ["totalchuong", "vntq-select-chuong", "<option"]:
+        j = r.text.find(k); print(k, "=>", r.text[j-200:j+600] if j>=0 else None)
+r = get("https://vietnamthuquan.eu/TacPham/noi-buon-chien-tranh-3530/chuong-2")
+if r:
+    soup = BeautifulSoup(r.text, "html.parser")
+    print([x.get_text(strip=True) for x in soup.select(".chuongso_a, .vntq-reader-title")])
+    c = soup.select_one("#vntqTextContent"); print("len", len(c.get_text()) if c else None)
+
+for u in ["https://dtruyen.club/?s=tien", "https://dtruyen.club/tim-kiem/?tukhoa=tien", "https://dtruyen.club/"]:
+    r = get(u)
+    if r is not None and r.ok:
+        soup = BeautifulSoup(r.text, "html.parser")
+        st = [a["href"] for a in soup.find_all("a", href=True) if re.match(r"https://dtruyen\.club/[^/]+/$", a["href"]) and "the-loai" not in a["href"]]
+        print("STORIES", st[:8])
+        if st:
+            r2 = get(st[0]); 
+            if r2: outline(r2.text, 200, "main") ; print(re.findall(r'<input[^>]+>', r2.text)[:8]); print(re.findall(r'.{0,100}admin-ajax.{0,200}', r2.text)[:4])
+            ch = [a["href"] for a in BeautifulSoup(r2.text,"html.parser").find_all("a", href=True) if "chuong" in a["href"]][:3]
+            print("CH", ch)
+            if ch:
+                r3 = get(ch[0]); 
+                if r3: outline(r3.text, 50, "main")
+        break
