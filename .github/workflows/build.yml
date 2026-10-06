@@ -3,7 +3,7 @@ name: Build & Release APK
 on:
   push:
     branches: [ "main", "ccr-*" ]
-    paths-ignore: [ "**.md", "tools/**", ".github/workflows/probe.yml" ]
+    paths-ignore: [ "**.md" ]
   workflow_dispatch:
 
 permissions:
@@ -43,14 +43,17 @@ jobs:
           name: StoryReader-v${{ env.VERSION_NAME }}
           path: dist/*.apk
 
-      - name: Debug release permission
+      - name: Clean up diagnostic drafts
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api repos/${{ github.repository }} --jq '.permissions' || true
-          gh api -X POST repos/${{ github.repository }}/releases -f tag_name=debug-${{ github.run_number }} -f target_commitish=${{ github.sha }} -F draft=true -F prerelease=true 2>&1 | head -20 || true
-          git tag debug-tag-${{ github.run_number }} && git push origin debug-tag-${{ github.run_number }} 2>&1 | tail -5 || true
+          for id in $(gh api repos/${{ github.repository }}/releases --jq '.[] | select(.draft and (.tag_name | startswith("debug-"))) | .id'); do
+            gh api -X DELETE repos/${{ github.repository }}/releases/$id
+          done
+          for t in $(gh api repos/${{ github.repository }}/git/matching-refs/tags/debug-tag- --jq '.[].ref'); do
+            gh api -X DELETE repos/${{ github.repository }}/git/$t
+          done
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
