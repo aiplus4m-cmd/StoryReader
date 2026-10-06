@@ -1,0 +1,68 @@
+name: Build & Release APK
+
+on:
+  push:
+    branches: [ "main", "ccr-*" ]
+    paths-ignore: [ "**.md", "tools/**", ".github/workflows/probe.yml" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Unit tests (bao gồm kiểm tra trực tiếp các nguồn truyện)
+        continue-on-error: true
+        run: ./gradlew --no-daemon testReleaseUnitTest
+
+      - name: Rename APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/StoryReader-v${VERSION_NAME}.apk"
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StoryReader-v${{ env.VERSION_NAME }}
+          path: dist/*.apk
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION_NAME }}
+          name: StoryReader v${{ env.VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
+          make_latest: ${{ github.ref == 'refs/heads/main' }}
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
+          files: dist/*.apk
+          body: |
+            **StoryReader** – ứng dụng tìm & đọc truyện dạng lật trang.
+            Dev: NhảmStudio • Web: https://topvl.net
+
+            Nhánh: `${{ github.ref_name }}` • Commit: `${{ github.sha }}`
+
+            ### Nguồn truyện
+            - Wattpad – https://www.wattpad.com
+            - TruyenFull – https://truyenfull.live
+            - Project Gutenberg – https://www.gutenberg.org (qua API Gutendex)
+
+            ### Miễn trừ trách nhiệm
+            Ứng dụng không lưu trữ hay sở hữu nội dung truyện; toàn bộ nội dung được tải trực tiếp từ website nguồn và được ghi rõ nguồn.
+            Bản quyền thuộc về tác giả và website nguồn. NhảmStudio không chịu trách nhiệm về nội dung do các nguồn cung cấp.

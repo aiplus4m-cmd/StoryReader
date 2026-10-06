@@ -1,0 +1,6 @@
+-dontwarn org.jspecify.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
+-keep class org.jsoup.** { *; }
