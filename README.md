@@ -1,6 +1,6 @@
-# StoryReader
+# Nhảm StoryReader
 
-<p align="center"><img src="app/src/main/res/drawable-nodpi/logo_full.png" width="360" alt="NhảmStudio"></p>
+<p align="center"><img src="app/src/main/res/drawable-nodpi/app_icon.png" width="160" alt="Nhảm StoryReader"> <img src="app/src/main/res/drawable-nodpi/logo_full.png" width="300" alt="NhảmStudio"></p>
 
 Ứng dụng Android tìm và đọc truyện từ các nguồn miễn phí, đọc theo kiểu **lật trang** như sách giấy.
 
@@ -32,11 +32,11 @@
 
 ## Miễn trừ trách nhiệm
 
-StoryReader hoạt động như một trình duyệt chuyên dụng: ứng dụng **không lưu trữ, sở hữu hay phát hành**
+Nhảm StoryReader hoạt động như một trình duyệt chuyên dụng: ứng dụng **không lưu trữ, sở hữu hay phát hành**
 nội dung truyện nào trên máy chủ riêng. Toàn bộ nội dung được tải trực tiếp từ các website nguồn công khai
 và luôn được ghi rõ nguồn. Bản quyền thuộc về tác giả, dịch giả và website nguồn tương ứng.
 NhảmStudio không chịu trách nhiệm về tính chính xác, hợp pháp hay bản quyền của nội dung do các nguồn cung cấp.
-StoryReader không liên kết hay được xác nhận bởi bất kỳ website nguồn nào; tên và nhãn hiệu thuộc về chủ sở hữu.
+Nhảm StoryReader không liên kết hay được xác nhận bởi bất kỳ website nguồn nào; tên và nhãn hiệu thuộc về chủ sở hữu.
 Chủ sở hữu nội dung muốn gỡ một nguồn khỏi ứng dụng vui lòng liên hệ qua https://topvl.net.
 
 ## Tải APK

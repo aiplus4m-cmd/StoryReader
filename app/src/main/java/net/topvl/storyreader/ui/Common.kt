@@ -47,14 +47,14 @@ const val DEV_NAME = "NhảmStudio"
 const val DEV_WEB = "https://topvl.net"
 
 const val DISCLAIMER_TEXT =
-    "StoryReader là ứng dụng đọc truyện miễn phí, hoạt động như một trình duyệt chuyên dụng: " +
+    "Nhảm StoryReader là ứng dụng đọc truyện miễn phí, hoạt động như một trình duyệt chuyên dụng: " +
         "ứng dụng KHÔNG lưu trữ, sở hữu hay phát hành bất kỳ nội dung truyện nào trên máy chủ riêng.\n\n" +
         "• Toàn bộ nội dung (tên truyện, ảnh bìa, mô tả, nội dung chương) được tải trực tiếp từ các website nguồn " +
         "công khai và luôn được ghi rõ nguồn gốc trong ứng dụng.\n" +
         "• Bản quyền nội dung thuộc về tác giả, dịch giả và website nguồn tương ứng. Hãy ủng hộ tác giả và website nguồn.\n" +
         "• $DEV_NAME không chịu trách nhiệm về tính chính xác, hợp pháp hay bản quyền của nội dung do các nguồn cung cấp, " +
         "cũng như mọi thiệt hại phát sinh từ việc sử dụng nội dung đó.\n" +
-        "• StoryReader không liên kết, không được tài trợ hay xác nhận bởi bất kỳ website nguồn nào. " +
+        "• Nhảm StoryReader không liên kết, không được tài trợ hay xác nhận bởi bất kỳ website nguồn nào. " +
         "Tên và nhãn hiệu thuộc về chủ sở hữu tương ứng.\n" +
         "• Nếu bạn là chủ sở hữu nội dung và muốn gỡ bỏ một nguồn khỏi ứng dụng, vui lòng liên hệ qua $DEV_WEB.\n" +
         "• Người dùng tự chịu trách nhiệm về việc sử dụng nội dung theo quy định pháp luật nơi mình sinh sống."

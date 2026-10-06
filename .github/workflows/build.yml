@@ -35,12 +35,12 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/StoryReader-v${VERSION_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/NhamStoryReader-v${VERSION_NAME}.apk"
           ls -la dist
 
       - uses: actions/upload-artifact@v4
         with:
-          name: StoryReader-v${{ env.VERSION_NAME }}
+          name: NhamStoryReader-v${{ env.VERSION_NAME }}
           path: dist/*.apk
 
       - name: Clean up diagnostic drafts
@@ -59,13 +59,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION_NAME }}
-          name: StoryReader v${{ env.VERSION_NAME }}
+          name: Nhảm StoryReader v${{ env.VERSION_NAME }}
           target_commitish: ${{ github.sha }}
           make_latest: ${{ github.ref == 'refs/heads/main' }}
           prerelease: ${{ github.ref != 'refs/heads/main' }}
           files: dist/*.apk
           body: |
-            **StoryReader** – ứng dụng tìm & đọc truyện dạng lật trang.
+            **Nhảm StoryReader** – ứng dụng tìm & đọc truyện dạng lật trang.
             Dev: NhảmStudio • Web: https://topvl.net
 
             Nhánh: `${{ github.ref_name }}` • Commit: `${{ github.sha }}`

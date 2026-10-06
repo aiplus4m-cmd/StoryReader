@@ -114,7 +114,7 @@ fun SearchScreen(
 
     Column(modifier.fillMaxSize().statusBarsPadding()) {
         Text(
-            "StoryReader",
+            "Nhảm StoryReader",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
