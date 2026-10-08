@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -751,7 +752,7 @@ private fun ImageZoomDialog(url: String, sourceId: String, onDismiss: () -> Unit
         Box(
             Modifier.fillMaxSize().background(Color.Black)
                 .pointerInput(Unit) {
-                    androidx.compose.foundation.gestures.detectTransformGestures { _, pan, zoom, _ ->
+                    detectTransformGestures { _, pan, zoom, _ ->
                         scale = (scale * zoom).coerceIn(1f, 5f)
                         offset = if (scale > 1f) offset + pan else androidx.compose.ui.geometry.Offset.Zero
                     }
