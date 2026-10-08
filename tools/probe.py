@@ -34,7 +34,47 @@ def links(r, k=60):
         if a["href"] not in [o[0] for o in out]: out.append((a["href"],t))
     for h,t in out[:k]: print("   ",h[:110],"|",t)
 
-for home in ["https://tieuthuyet.vn/", "https://truyenc.com/", "https://lmvn.com/truyen/index.php"]:
-    r=get(home)
-    if r is not None:
-        forms(r); links(r, 80)
+
+def first(r, pat):
+    soup=BeautifulSoup(r.text,"html.parser")
+    for a in soup.find_all("a",href=True):
+        if re.search(pat,a["href"]): return requests.compat.urljoin(r.url,a["href"])
+# ---- tieuthuyet
+r=get("https://tieuthuyet.vn/search?q=yeu")
+if r:
+    outline(r.text,120,"main") if BeautifulSoup(r.text,"html.parser").select_one("main") else outline(r.text,160)
+    u=first(r, r"tieuthuyet\.vn/(?!the-loai|danh-sach|search|login|review)[a-z0-9-]+$")
+    print("STORY",u)
+    if u:
+        r2=get(u); outline(r2.text,200)
+        print(re.findall(r'.{0,100}(?:ajax|api/|chapter|chuong).{0,150}', r2.text)[:12])
+        c=first(r2, r"chuong|chapter")
+        print("CH",c)
+        if c:
+            r3=get(c); outline(r3.text,80)
+# ---- truyenc
+r=get("https://truyenc.com/")
+if r:
+    print(re.findall(r'<script[^>]*src="([^"]+)"', r.text)[:10])
+    print(re.findall(r'.{0,120}(?:search|tim-kiem|keyword|\?q=).{0,160}', re.sub(r'<style.*?</style>','',r.text,flags=re.S), re.I)[:12])
+for u in ["https://truyenc.com/tim-kiem?q=ma","https://truyenc.com/search?q=ma","https://truyenc.com/tim-kiem/ma"]:
+    r=get(u)
+u="https://truyenc.com/truyen/cuu-bien-lien-78"
+r2=get(u)
+if r2:
+    outline(r2.text,200)
+    c=first(r2, r"chuong|chap")
+    print("CH",c)
+    if c:
+        r3=get(c); outline(r3.text,80)
+# ---- lmvn
+r=get("https://lmvn.com/truyen/index.php")
+if r:
+    i=r.text.find('name="searchMe"'); i=r.text.find("searchMe")
+    print(r.text[i-1500:i+1500])
+    s2=BeautifulSoup(r.text,"html.parser")
+    for f in s2.find_all("form"): print("FORM", str(f)[:800])
+r=get("https://lmvn.com/truyen/index.php?func=main&cat=2")
+if r:
+    st=first(r, r"func=(viewstory|view|story|doc)|id=")
+    print("SAMPLE LINKS"); links(r,60)
