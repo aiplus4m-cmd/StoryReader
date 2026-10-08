@@ -10,16 +10,15 @@ object WattpadSource : StorySource {
     override val language = "đa ngôn ngữ"
 
     private const val API = "https://www.wattpad.com"
-    private const val PAGE_SIZE = 20
+    private const val PAGE_SIZE = 50
+    private const val FIELDS = "id,title,cover,description,user(name),numParts,readCount,completed,url"
 
-    override suspend fun search(query: String, page: Int): List<Story> {
-        val offset = (page - 1) * PAGE_SIZE
-        val url = "$API/v4/search/stories?query=${query.urlEncode()}&limit=$PAGE_SIZE&offset=$offset" +
-            "&fields=stories(id,title,cover,description,user(name),numParts,url),total"
-        val json = JSONObject(Http.get(url, mapOf("Accept" to "application/json")))
-        val arr = json.optJSONArray("stories") ?: return emptyList()
+    private fun parseStories(arr: org.json.JSONArray?): List<Story> {
+        if (arr == null) return emptyList()
         return (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)
+            val parts = o.optInt("numParts", 0)
+            val reads = o.optLong("readCount", 0)
             Story(
                 sourceId = id,
                 url = o.optString("url").ifBlank { "$API/story/${o.optString("id")}" },
@@ -27,8 +26,46 @@ object WattpadSource : StorySource {
                 author = o.optJSONObject("user")?.optString("name").orEmpty(),
                 cover = o.optString("cover"),
                 description = o.optString("description"),
+                info = listOfNotNull(
+                    if (parts > 0) "$parts chương" else null,
+                    if (reads > 0) "${formatCount(reads)} lượt đọc" else null,
+                    if (o.optBoolean("completed")) "Hoàn thành" else null,
+                ).joinToString(" • "),
             )
         }
+    }
+
+    private fun formatCount(n: Long): String = when {
+        n >= 1_000_000 -> String.format(java.util.Locale.US, "%.1fM", n / 1_000_000.0)
+        n >= 1_000 -> String.format(java.util.Locale.US, "%.1fK", n / 1_000.0)
+        else -> n.toString()
+    }
+
+    override suspend fun search(query: String, page: Int): List<Story> {
+        val q = query.trim()
+        // "@tên_tác_giả": liệt kê truyện của tác giả đó
+        if (q.startsWith("@")) {
+            if (page > 1) return emptyList()
+            val user = q.removePrefix("@").trim().urlEncode()
+            val json = JSONObject(Http.get("$API/api/v3/users/$user/stories?limit=100&fields=stories($FIELDS)"))
+            return parseStories(json.optJSONArray("stories"))
+        }
+        val offset = (page - 1) * PAGE_SIZE
+        val url = "$API/v4/search/stories?query=${q.urlEncode()}&limit=$PAGE_SIZE&offset=$offset&mature=1" +
+            "&fields=stories($FIELDS),total"
+        val json = JSONObject(Http.get(url, mapOf("Accept" to "application/json")))
+        return parseStories(json.optJSONArray("stories"))
+    }
+
+    override suspend fun resolve(url: String): Story? {
+        // Link truyện: /story/123-ten ; link chương: /123456-ten-chuong
+        Regex("""/story/(\d+)""").find(url)?.let {
+            return Story(sourceId = id, url = "$API/story/${it.groupValues[1]}", title = url)
+        }
+        val partId = Regex("""wattpad\.com/(\d+)""").find(url)?.groupValues?.get(1) ?: return null
+        val o = JSONObject(Http.get("$API/v4/parts/$partId?fields=id,group(id,title)"))
+        val group = o.optJSONObject("group") ?: return null
+        return Story(sourceId = id, url = "$API/story/${group.optString("id")}", title = group.optString("title"))
     }
 
     private fun storyId(url: String): String =

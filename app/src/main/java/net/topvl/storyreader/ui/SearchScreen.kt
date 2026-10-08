@@ -33,10 +33,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import android.widget.Toast
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -47,6 +51,7 @@ import kotlinx.coroutines.launch
 import net.topvl.storyreader.data.Library
 import net.topvl.storyreader.source.Sources
 import net.topvl.storyreader.source.Story
+import net.topvl.storyreader.source.rankBy
 
 data class SourceResult(
     val loading: Boolean = false,
@@ -86,7 +91,7 @@ class SearchViewModel : ViewModel() {
         jobs += viewModelScope.launch {
             try {
                 val list = source.search(q, page)
-                val merged = (if (page == 1) list else prev.stories + list).distinctBy { it.url }
+                val merged = (if (page == 1) list else prev.stories + list).distinctBy { it.url }.rankBy(q)
                 results[id] = SourceResult(
                     stories = merged,
                     page = page,
@@ -110,6 +115,26 @@ fun SearchScreen(
 ) {
     val disabled by library.disabledSources.collectAsState()
     val focus = LocalFocusManager.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var resolving by remember { mutableStateOf(false) }
+
+    fun submit() {
+        focus.clearFocus()
+        val text = vm.query.trim()
+        if (Sources.isUrl(text)) {
+            // Dán link truyện/chương (ví dụ link tìm được trên Google) để mở trực tiếp
+            resolving = true
+            scope.launch {
+                val story = runCatching { Sources.resolve(text) }.getOrNull()
+                resolving = false
+                if (story != null) onOpen(story)
+                else Toast.makeText(context, "Không nhận ra đường dẫn này thuộc nguồn nào", Toast.LENGTH_LONG).show()
+            }
+        } else {
+            vm.search(Sources.all.map { it.id }.filterNot { it in disabled })
+        }
+    }
     val enabledIds = Sources.all.map { it.id }.filterNot { it in disabled }
 
     Column(modifier.fillMaxSize().statusBarsPadding()) {
@@ -124,14 +149,14 @@ fun SearchScreen(
             value = vm.query,
             onValueChange = { vm.query = it },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            placeholder = { Text("Tên truyện, tác giả…") },
+            placeholder = { Text("Tên truyện, @tác giả Wattpad, hoặc dán link…") },
             leadingIcon = { Icon(Icons.Filled.Search, null) },
             trailingIcon = {
                 if (vm.query.isNotEmpty()) IconButton(onClick = { vm.query = "" }) { Icon(Icons.Filled.Clear, "Xoá") }
             },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { focus.clearFocus(); vm.search(enabledIds) }),
+            keyboardActions = KeyboardActions(onSearch = { submit() }),
         )
         Row(
             Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
@@ -146,9 +171,20 @@ fun SearchScreen(
             }
         }
         HorizontalDivider(Modifier.padding(top = 8.dp))
+        if (resolving) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("Đang mở đường dẫn…", style = MaterialTheme.typography.bodySmall)
+            }
+        }
 
         if (vm.lastQuery.isEmpty()) {
-            EmptyState("Nhập từ khoá để tìm truyện trên ${enabledIds.size} nguồn.\nChạm vào tên nguồn để bật/tắt.")
+            EmptyState(
+                "Nhập từ khoá để tìm truyện trên ${enabledIds.size} nguồn.\nChạm vào tên nguồn để bật/tắt.\n\n" +
+                    "Mẹo: dán link truyện hoặc link chương (ví dụ tìm được trên Google) để mở trực tiếp; " +
+                    "gõ @tên_tác_giả để xem truyện của tác giả trên Wattpad."
+            )
             return@Column
         }
 
@@ -181,7 +217,7 @@ fun SearchScreen(
                     }
                 }
                 items(r.stories, key = { "${source.id}-${it.url}" }) { story ->
-                    StoryRow(story) { onOpen(story) }
+                    StoryRow(story, subtitle = story.info.ifBlank { null }) { onOpen(story) }
                 }
                 if (r.hasMore && !r.loading) {
                     item(key = "m-${source.id}") {
@@ -191,6 +227,19 @@ fun SearchScreen(
                     }
                 }
                 item(key = "d-${source.id}") { HorizontalDivider(Modifier.padding(top = 4.dp)) }
+            }
+            item(key = "web-search") {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text(
+                        "Không thấy truyện cần tìm? Tìm trên Google rồi dán link truyện/chương vào ô tìm kiếm để mở trong app.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = {
+                        openUrl(context, "https://www.google.com/search?q=" +
+                            java.net.URLEncoder.encode("${vm.lastQuery} site:wattpad.com", "UTF-8"))
+                    }) { Text("Tìm \"${vm.lastQuery}\" trên Google (Wattpad)") }
+                }
             }
         }
     }

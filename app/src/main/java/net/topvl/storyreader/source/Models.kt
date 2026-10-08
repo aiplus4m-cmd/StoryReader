@@ -7,6 +7,8 @@ data class Story(
     val author: String = "",
     val cover: String = "",
     val description: String = "",
+    /** Thông tin phụ hiển thị ở kết quả tìm kiếm (số chương, lượt đọc…), không lưu trữ. */
+    val info: String = "",
 )
 
 data class Chapter(

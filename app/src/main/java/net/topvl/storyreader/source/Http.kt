@@ -101,3 +101,32 @@ fun String.foldVi(): String =
         .replace('đ', 'd')
         .replace(Regex("[^a-z0-9]+"), " ")
         .trim()
+
+/** Phần tên chính: bỏ các nhãn [..] (..) và phần " - tác giả" phía sau. */
+fun coreTitle(title: String): String =
+    title.replace(Regex("""[\[(（【][^\])）】]*[\])）】]"""), " ")
+        .split(Regex("""\s[-–|]\s""")).first()
+        .replace(Regex("""\s+"""), " ").trim(' ', '-', ':', '|', ',')
+
+/** Điểm khớp giữa từ khoá và tên truyện (0 = không khớp). */
+fun matchScore(query: String, story: Story): Int {
+    val q = query.foldVi()
+    if (q.isEmpty()) return 0
+    val t = story.title.foldVi()
+    val c = coreTitle(story.title).foldVi()
+    val words = q.split(' ')
+    return when {
+        t == q || c == q -> 100
+        c.startsWith(q) || t.startsWith(q) -> 80
+        " $t ".contains(" $q ") -> 70
+        t.contains(q) -> 60
+        words.all { " $t ".contains(" $it ") } -> 50
+        words.all { "$t ${story.author.foldVi()}".contains(it) } -> 30
+        else -> 0
+    }
+}
+
+/** Đưa các truyện khớp tên lên đầu, giữ nguyên thứ tự gốc trong cùng mức. */
+fun List<Story>.rankBy(query: String): List<Story> =
+    withIndex().sortedWith(compareByDescending<IndexedValue<Story>> { matchScore(query, it.value) }.thenBy { it.index })
+        .map { it.value }
