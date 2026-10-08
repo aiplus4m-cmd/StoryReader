@@ -69,11 +69,18 @@ object WattpadSource : StorySource {
         val direct = runCatching { storiesOf(name.replace(" ", "")) }.getOrNull()
         if (!direct.isNullOrEmpty()) return direct
         val users = org.json.JSONArray(
-            Http.get("$API/v4/search/users?query=${name.urlEncode()}&limit=5&fields=username,name")
+            Http.get("$API/v4/search/users?query=${name.urlEncode()}&limit=20&fields=username,name")
         )
-        val names = (0 until users.length()).map { users.getJSONObject(it).optString("username") }.filter { it.isNotBlank() }
-        if (names.isEmpty()) throw IllegalStateException("Không tìm thấy tác giả \"$name\" trên Wattpad")
-        return names.take(3).flatMap { runCatching { storiesOf(it) }.getOrDefault(emptyList()) }.distinctBy { it.url }
+        val all = (0 until users.length()).map { users.getJSONObject(it) }
+            .map { it.optString("username") to it.optString("name") }
+            .filter { it.first.isNotBlank() }
+        if (all.isEmpty()) throw IllegalStateException("Không tìm thấy tác giả \"$name\" trên Wattpad")
+        // Ưu tiên tài khoản có tên hiển thị / username trùng khớp với tên đã gõ
+        val q = name.foldVi()
+        val qCompact = q.replace(" ", "")
+        val exact = all.filter { (u, n) -> n.foldVi() == q || u.foldVi().replace(" ", "") == qCompact }
+        val chosen = exact.ifEmpty { all.take(3) }.map { it.first }
+        return chosen.take(3).flatMap { runCatching { storiesOf(it) }.getOrDefault(emptyList()) }.distinctBy { it.url }
     }
 
     override suspend fun resolve(url: String): Story? {
