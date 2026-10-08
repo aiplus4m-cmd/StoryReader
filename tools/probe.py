@@ -30,42 +30,27 @@ for q in ["ngôn tình", "đam mỹ", "xuyên không", "tổng tài", "hệ th�
 print("SEED", [(s["title"], s.get("mature"), (s.get("language") or {}).get("id"), s.get("readCount")) for s in seed][:25])
 
 
-def core(t):
-    t=re.sub(r"[\[\(][^\]\)]*[\]\)]"," ",t)          # bỏ [..] (..)
-    t=re.split(r"\s[-–|]\s",t)[0]                      # bỏ " - tác giả"
-    return re.sub(r"\s+"," ",t).strip(" -:|")
-def deep(q, want, pages=6, extra=None):
-    for p in range(pages):
-        params={"query":q,"limit":50,"offset":p*50,"mature":"1","fields":F}
-        if extra: params.update(extra)
-        tot,st=ws(params,"deep")
-        for i,s in enumerate(st):
-            if s["id"]==want: return p*50+i, tot
-        if len(st)<50: break
-    return None, tot
-q0=seed[7]["title"] if len(seed)>7 else None
-if q0:
-    tot,st=ws({"query":q0,"limit":50,"mature":"1","fields":F},"x")
-    print("RESULTS FOR", q0, tot, [x["title"] for x in st][:15])
-found_full=found_core=0
-for s in seed[:20]:
-    t=s["title"]; c=core(t)
-    a=deep(t,s["id"]); b=deep(c,s["id"]) if c and c!=t else ("same",None)
-    if a[0] is not None: found_full+=1
-    if b[0] not in (None,): found_core+=1
-    print(f"- {t!r} core={c!r} full_pos={a} core_pos={b}")
-print("FOUND within 300: full", found_full, "core", found_core)
 
-# Trang tìm kiếm web
-for s in seed[:3]:
-    r=S.get("https://www.wattpad.com/search/"+urllib.parse.quote(s["title"]), timeout=20)
-    ids=re.findall(r'"id":"?(\d{6,})"?,"title"', r.text)
-    print("WEBPAGE", r.status_code, len(r.text), "found" if s["id"] in r.text else "notfound", ids[:5], re.findall(r'(?:api|v\d)/search[^"\' ]{0,120}', r.text)[:5])
-# DDG không site:
-for s in seed[:6]:
-    for q in [f'wattpad "{core(s["title"])}"', f'{s["title"]} wattpad']:
-        try:
-            r=S.get("https://html.duckduckgo.com/html/",params={"q":q},timeout=20)
-            ids=list(dict.fromkeys(re.findall(r'wattpad\.com(?:%2F|/)story(?:%2F|/)(\d+)', r.text)))
-            print(f"  DDG {r.status_code} q={q!r} found={s['id'] in ids} ids={ids[:5]}")
-        except Exception as e: print("DDG ERR",e)
+APPF="stories(id,title,cover,description,user(name),numParts,url),total"
+V={
+ "APP(limit20,offset0,appfields)": {"limit":20,"offset":0,"fields":APPF},
+ "limit20,no-offset": {"limit":20,"fields":F},
+ "limit20,offset0": {"limit":20,"offset":0,"fields":F},
+ "limit50,no-offset": {"limit":50,"fields":F},
+ "limit50,offset0": {"limit":50,"offset":0,"fields":F},
+ "limit50,offset0,mature1": {"limit":50,"offset":0,"mature":"1","fields":F},
+ "limit20,offset0,mature1": {"limit":20,"offset":0,"mature":"1","fields":F},
+ "limit20,mature1,no-offset": {"limit":20,"mature":"1","fields":F},
+ "web(limit20 mature true offset0)": {"limit":20,"offset":0,"mature":"true","fields":F},
+}
+score={k:0 for k in V}; tots={k:[] for k in V}
+for sd in seed[:20]:
+    row=[]
+    for k,p in V.items():
+        pp=dict(p); pp["query"]=sd["title"]
+        tot,st=ws(pp,k)
+        pos=next((i for i,x in enumerate(st) if x["id"]==sd["id"]),None)
+        if pos is not None: score[k]+=1
+        row.append(f"{pos}/{tot}")
+    print(f"- {sd['title'][:45]!r}: "+" | ".join(row))
+for k in V: print(f"SCORE {score[k]:2d}/20  {k}")
