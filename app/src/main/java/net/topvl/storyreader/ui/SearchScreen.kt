@@ -52,6 +52,9 @@ import net.topvl.storyreader.data.Library
 import net.topvl.storyreader.source.Sources
 import net.topvl.storyreader.source.Story
 import net.topvl.storyreader.source.rankBy
+import net.topvl.storyreader.source.matchScore
+import net.topvl.storyreader.source.WattpadAuth
+import net.topvl.storyreader.source.WattpadSource
 
 data class SourceResult(
     val loading: Boolean = false,
@@ -66,6 +69,8 @@ class SearchViewModel : ViewModel() {
     var lastQuery by mutableStateOf("")
         private set
     val results = mutableStateMapOf<String, SourceResult>()
+    /** Nguồn đang mở rộng phần "kết quả ít liên quan". */
+    val showLoose = mutableStateMapOf<String, Boolean>()
     private val jobs = mutableListOf<Job>()
 
     fun search(enabled: List<String>) {
@@ -74,6 +79,7 @@ class SearchViewModel : ViewModel() {
         jobs.forEach { it.cancel() }
         jobs.clear()
         results.clear()
+        showLoose.clear()
         lastQuery = q
         enabled.forEach { id -> load(id, q, 1) }
     }
@@ -111,8 +117,11 @@ fun SearchScreen(
     vm: SearchViewModel,
     library: Library,
     modifier: Modifier = Modifier,
+    onWattpadLogin: () -> Unit = {},
     onOpen: (Story) -> Unit,
 ) {
+    var loginTick by remember { mutableStateOf(0) }
+    val wattpadLoggedIn = remember(loginTick) { WattpadAuth.isLoggedIn() }
     val disabled by library.disabledSources.collectAsState()
     val focus = LocalFocusManager.current
     val context = LocalContext.current
@@ -170,7 +179,25 @@ fun SearchScreen(
                 )
             }
         }
-        HorizontalDivider(Modifier.padding(top = 8.dp))
+        if (WattpadSource.id !in disabled) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (wattpadLoggedIn) "Wattpad: đã đăng nhập" else "Wattpad: chưa đăng nhập – truyện Trưởng thành (Mature) bị ẩn",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (wattpadLoggedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (wattpadLoggedIn) {
+                    TextButton(onClick = { WattpadAuth.logout(); loginTick++ }) { Text("Đăng xuất") }
+                } else {
+                    TextButton(onClick = onWattpadLogin) { Text("Đăng nhập") }
+                }
+            }
+        }
+        HorizontalDivider(Modifier.padding(top = 4.dp))
         if (resolving) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -216,8 +243,47 @@ fun SearchScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
                     }
                 }
-                items(r.stories, key = { "${source.id}-${it.url}" }) { story ->
+                // Truyện khớp tên lên trước; kết quả ít liên quan gom lại phía dưới
+                val (matched, loose) = r.stories.partition { matchScore(vm.lastQuery, it) > 0 }
+                val expanded = vm.showLoose[source.id] == true
+                items(matched, key = { "${source.id}-${it.url}" }) { story ->
                     StoryRow(story, subtitle = story.info.ifBlank { null }) { onOpen(story) }
+                }
+                if (source.id == WattpadSource.id && matched.isEmpty() && !r.loading && r.error == null &&
+                    !wattpadLoggedIn && !vm.lastQuery.startsWith("@")
+                ) {
+                    item(key = "wp-hint") {
+                        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            Text(
+                                "Không có truyện nào trùng tên. Truyện bạn tìm có thể gắn nhãn Trưởng thành – " +
+                                    "Wattpad chỉ hiển thị loại truyện này khi đã đăng nhập.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            TextButton(onClick = onWattpadLogin) { Text("Đăng nhập Wattpad") }
+                        }
+                    }
+                }
+                if (loose.isNotEmpty()) {
+                    if (expanded || vm.lastQuery.startsWith("@")) {
+                        if (matched.isNotEmpty()) item(key = "loose-h-${source.id}") {
+                            Text(
+                                "Kết quả ít liên quan",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            )
+                        }
+                        items(loose, key = { "${source.id}-${it.url}" }) { story ->
+                            StoryRow(story, subtitle = story.info.ifBlank { null }) { onOpen(story) }
+                        }
+                    } else {
+                        item(key = "loose-${source.id}") {
+                            TextButton(onClick = { vm.showLoose[source.id] = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                                Text("Hiện ${loose.size} kết quả ít liên quan")
+                            }
+                        }
+                    }
                 }
                 if (r.hasMore && !r.loading) {
                     item(key = "m-${source.id}") {
@@ -229,17 +295,12 @@ fun SearchScreen(
                 item(key = "d-${source.id}") { HorizontalDivider(Modifier.padding(top = 4.dp)) }
             }
             item(key = "web-search") {
-                Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text(
-                        "Không thấy truyện cần tìm? Tìm trên Google rồi dán link truyện/chương vào ô tìm kiếm để mở trong app.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TextButton(onClick = {
-                        openUrl(context, "https://www.google.com/search?q=" +
-                            java.net.URLEncoder.encode("${vm.lastQuery} site:wattpad.com", "UTF-8"))
-                    }) { Text("Tìm \"${vm.lastQuery}\" trên Google (Wattpad)") }
-                }
+                Text(
+                    "Không thấy truyện? Dùng tab \"Tìm web\" để tìm qua Google/Bing và mở thẳng trong app.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
             }
         }
     }

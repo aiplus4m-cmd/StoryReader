@@ -59,6 +59,11 @@ object LmvnSource : StorySource {
         (siteSearch.await() + letterRows).filter(::matches).distinctBy { it.url }
     }
 
+    override suspend fun resolve(url: String): Story? {
+        val sid = storyId(url) ?: return null
+        return Story(sourceId = id, url = "$BASE?func=viewpost&id=$sid", title = url)
+    }
+
     private fun storyId(url: String) = Regex("""[?&]id=([A-Za-z0-9]+)""").find(url)?.groupValues?.get(1)
 
     override suspend fun detail(story: Story): StoryDetail {

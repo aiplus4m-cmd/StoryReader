@@ -39,4 +39,14 @@ class SearchRankTest {
         val id = Regex("""/story/(\d+)""").find(story.url)!!.groupValues[1]
         assertTrue(resolved.url.endsWith("/story/$id"))
     }
+
+    /** Cần mạng: "@username" và "@tên hiển thị" đều phải ra truyện của tác giả. */
+    @Test fun wattpadAuthorSearch() = runBlocking {
+        val byUsername = WattpadSource.search("@antinh28", 1)
+        println("@antinh28 -> ${byUsername.map { it.title }}")
+        assertTrue(byUsername.isNotEmpty())
+        val byName = WattpadSource.search("@An Tĩnh", 1)
+        println("@An Tĩnh -> ${byName.map { it.title + " / " + it.author }}")
+        assertTrue(byName.any { it.author == "antinh28" })
+    }
 }

@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -36,6 +37,7 @@ import org.json.JSONObject
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     SEARCH("Tìm kiếm", Icons.Filled.Search),
+    WEB("Tìm web", Icons.Filled.TravelExplore),
     LIBRARY("Tủ truyện", Icons.Filled.Favorite),
     BOOKMARKS("Bookmark", Icons.Filled.Bookmarks),
     ABOUT("Giới thiệu", Icons.Filled.Info),
@@ -61,6 +63,7 @@ fun StoryReaderApp() {
             composable("main") {
                 var tab by rememberSaveable { mutableStateOf(Tab.SEARCH) }
                 val searchVm: SearchViewModel = viewModel()
+                val webVm: WebSearchViewModel = viewModel()
                 Scaffold(
                     bottomBar = {
                         NavigationBar {
@@ -77,7 +80,10 @@ fun StoryReaderApp() {
                 ) { padding ->
                     val mod = Modifier.padding(bottom = padding.calculateBottomPadding())
                     when (tab) {
-                        Tab.SEARCH -> SearchScreen(searchVm, library, mod) { nav.openStory(it) }
+                        Tab.SEARCH -> SearchScreen(searchVm, library, mod, onWattpadLogin = { nav.navigate("wattpad_login") }) {
+                            nav.openStory(it)
+                        }
+                        Tab.WEB -> WebSearchScreen(webVm, mod) { nav.openStory(it) }
                         Tab.LIBRARY -> LibraryScreen(library, mod,
                             onOpen = { nav.openStory(it) },
                             onContinue = { p -> nav.openReader(p.story, p.chapterIndex, p.offset) })
@@ -87,6 +93,9 @@ fun StoryReaderApp() {
                         Tab.ABOUT -> AboutScreen(mod)
                     }
                 }
+            }
+            composable("wattpad_login") {
+                WattpadLoginScreen(onDone = { nav.popBackStack() })
             }
             composable(
                 "detail?story={story}",

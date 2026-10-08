@@ -27,6 +27,11 @@ object GutenbergSource : StorySource {
         }
     }
 
+    override suspend fun resolve(url: String): Story? {
+        val bid = Regex("""(?:ebooks|epub|files)/(\d+)""").find(url)?.groupValues?.get(1) ?: return null
+        return Story(sourceId = id, url = "$homepage/ebooks/$bid", title = url)
+    }
+
     private fun bookId(url: String) = Regex("""(\d+)""").findAll(url).last().value
 
     private suspend fun loadBook(bookId: String): List<ChapterContent> {

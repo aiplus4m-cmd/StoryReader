@@ -39,6 +39,13 @@ object TruyenCSource : StorySource {
             .map { (url, slug) -> Story(sourceId = id, url = url, title = titleFromSlug(slug)) }
     }
 
+    override suspend fun resolve(url: String): Story? {
+        if (storyUrl.matches(url)) return Story(sourceId = id, url = url, title = url)
+        // Link chương: lấy link "Trở về truyện"
+        val back = Http.doc(url).selectFirst("a.header-title[href*='/truyen/']")?.absUrl("href") ?: return null
+        return Story(sourceId = id, url = back, title = url)
+    }
+
     override suspend fun detail(story: Story): StoryDetail {
         val doc = Http.doc(story.url)
         val info = doc.selectFirst(".card-full-left .content")

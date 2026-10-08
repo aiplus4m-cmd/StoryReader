@@ -46,15 +46,34 @@ object WattpadSource : StorySource {
         // "@tên_tác_giả": liệt kê truyện của tác giả đó
         if (q.startsWith("@")) {
             if (page > 1) return emptyList()
-            val user = q.removePrefix("@").trim().urlEncode()
-            val json = JSONObject(Http.get("$API/api/v3/users/$user/stories?limit=100&fields=stories($FIELDS)"))
-            return parseStories(json.optJSONArray("stories"))
+            return authorStories(q.removePrefix("@").trim())
         }
         val offset = (page - 1) * PAGE_SIZE
         val url = "$API/v4/search/stories?query=${q.urlEncode()}&limit=$PAGE_SIZE&offset=$offset&mature=1" +
             "&fields=stories($FIELDS),total"
         val json = JSONObject(Http.get(url, mapOf("Accept" to "application/json")))
         return parseStories(json.optJSONArray("stories"))
+    }
+
+    /**
+     * Truyện của một tác giả. Wattpad chỉ nhận username (vd. "antinh28"), nên nếu người dùng gõ
+     * tên hiển thị (vd. "An Tĩnh") thì tra cứu tài khoản trước rồi mới lấy danh sách truyện.
+     */
+    private suspend fun authorStories(name: String): List<Story> {
+        if (name.isBlank()) return emptyList()
+        suspend fun storiesOf(username: String): List<Story> =
+            parseStories(
+                JSONObject(Http.get("$API/api/v3/users/${username.urlEncode()}/stories?limit=50&fields=stories($FIELDS)"))
+                    .optJSONArray("stories")
+            )
+        val direct = runCatching { storiesOf(name.replace(" ", "")) }.getOrNull()
+        if (!direct.isNullOrEmpty()) return direct
+        val users = org.json.JSONArray(
+            Http.get("$API/v4/search/users?query=${name.urlEncode()}&limit=5&fields=username,name")
+        )
+        val names = (0 until users.length()).map { users.getJSONObject(it).optString("username") }.filter { it.isNotBlank() }
+        if (names.isEmpty()) throw IllegalStateException("Không tìm thấy tác giả \"$name\" trên Wattpad")
+        return names.take(3).flatMap { runCatching { storiesOf(it) }.getOrDefault(emptyList()) }.distinctBy { it.url }
     }
 
     override suspend fun resolve(url: String): Story? {

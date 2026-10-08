@@ -24,6 +24,14 @@ object Http {
         .readTimeout(30, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
+        .addInterceptor { chain ->
+            // Gửi kèm phiên đăng nhập Wattpad (nếu người dùng đã đăng nhập trong app)
+            val req = chain.request()
+            val cookie = if (WattpadAuth.appliesTo(req.url.host)) WattpadAuth.cookies() else null
+            chain.proceed(
+                if (cookie.isNullOrBlank()) req else req.newBuilder().header("Cookie", cookie).build()
+            )
+        }
         .build()
 
     suspend fun get(url: String, headers: Map<String, String> = emptyMap()): String =
