@@ -43,39 +43,48 @@ def analyze(r, linkpat=None, maxkeys=70):
         return [requests.compat.urljoin(r.url,l[0]) for l in ls]
     return []
 
-print("=================== TIEUTHUYET")
-r=get("https://tieuthuyet.vn/search?q=yeu")
-if r: analyze(r, r"tieuthuyet\.vn/(?!the-loai|danh-sach|search|login|review|tac-gia)[a-z0-9-]+$")
-r=get("https://tieuthuyet.vn/search?q=yeu&page=2")
-r=get("https://tieuthuyet.vn/chi-duoc-keo-cam-khong-duoc-yeu-duong")
-if r:
-    ch=analyze(r, r"/chuong-")
-    print("  INPUTS", re.findall(r'<input[^>]+>', r.text)[:10])
-    print("  AJAX", re.findall(r'.{0,80}(?:ajax|/api/|list-chapter|loadChapter|page=).{0,120}', r.text)[:10])
-r=get("https://tieuthuyet.vn/chi-duoc-keo-cam-khong-duoc-yeu-duong/chuong-1")
-if r: analyze(r, r"/chuong-\d+")
 
-print("=================== TRUYENC")
-r=get("https://truyenc.com/")
+print("=================== TRUYENC JS")
+r=get("https://truyenc.com/static/js/main.min.js?v=0.0.7")
 if r:
-    print("  SCRIPTS", re.findall(r'<script[^>]*src="([^"]+)"', r.text)[:12])
-    print("  INLINE", re.findall(r'.{0,100}(?:search|keyword|tim-kiem|fetch\(|axios|\$\.(?:get|post|ajax)).{0,160}', re.sub(r'<style.*?</style>','',r.text,flags=re.S))[:12])
-    print("  INPUTS", re.findall(r'<input[^>]+>', r.text)[:10])
-for u in ["https://truyenc.com/tim-kiem?q=ma","https://truyenc.com/search?keyword=ma","https://truyenc.com/tim-truyen?keyword=ma","https://truyenc.com/tim-truyen-ma"]:
-    r=get(u)
-    if r: analyze(r, r"/truyen/[a-z0-9-]+-\d+$", 25)
+    print(re.findall(r'.{0,160}(?:search|keyword|tim-kiem|/api/|ajax|fetch\().{0,200}', r.text, re.I)[:20])
 r=get("https://truyenc.com/truyen/cuu-bien-lien-78")
 if r:
-    analyze(r, r"/chuong-")
-    print("  INPUTS", re.findall(r'<input[^>]+>', r.text)[:10])
+    soup=BeautifulSoup(r.text,"html.parser")
+    print("  PAGINATION", [ (a.get("href"), a.get_text(strip=True)) for a in soup.select(".pagination a, #storyChapSidebar a, a[href*=page]")][:20])
+    sb=soup.select_one("#storyChapSidebar"); print("  SIDEBAR", str(sb)[:1500] if sb else None)
+    print("  INLINE", re.findall(r'.{0,120}(?:storyChap|loadChap|page=|chapters).{0,200}', r.text)[:12])
+    d=soup.select_one(".card.card-full-left .content"); print("  INFO HTML", re.sub(r"\s+"," ",str(d))[:2500] if d else None)
 r=get("https://truyenc.com/truyen/cuu-bien-lien/chuong-1-dan-truyen-2390")
-if r: analyze(r, r"/chuong-", 30)
+if r:
+    soup=BeautifulSoup(r.text,"html.parser"); c=soup.select_one(".story-content"); print("  CONTENT HTML", str(c)[:1200])
+    print("  TITLE", [x.get_text(" ",strip=True) for x in soup.select(".page-title, .card-style .content h1, .card-style .content h2, .card-style .content h3, .card-style .content h4")][:6])
 
 print("=================== LMVN")
-r=get("https://lmvn.com/truyen/index.php")
+for u in ["https://lmvn.com/truyen/index.php?func=search&keyword=kim%20dung", "https://lmvn.com/truyen/index.php?func=search&keyword=tam%20quoc"]:
+    r=get(u)
+    if r:
+        ls=analyze(r, r"func=(?!main|tacgia|favorite|register)", 5)
+        soup=BeautifulSoup(r.text,"html.parser")
+        a=soup.find("a", href=re.compile(r"func=(view|story|doc|read)"))
+        if a: print("  RESULT CTX", re.sub(r"\s+"," ",str(a.find_parent("tr") or a.parent))[:1500])
+r=get("https://lmvn.com/truyen/index.php", method="POST", data={"func":"search","CODE":"0","keyword":"kim dung","searchin":"0"})
+if r: analyze(r, r"func=(?!main|tacgia|favorite|register)", 5)
+r=get("https://lmvn.com/truyen/index.php?func=main&cat=6")
 if r:
-    s2=BeautifulSoup(r.text,"html.parser")
-    for f in s2.find_all("form"): print("FORM", re.sub(r"\s+"," ",str(f))[:700])
-    i=r.text.find("function gosearch"); print(r.text[i:i+1200])
-r=get("https://lmvn.com/truyen/index.php?func=main&cat=2")
-if r: links=analyze(r, r"func=(?!main)|id=", 30)
+    soup=BeautifulSoup(r.text,"html.parser")
+    ls=[a["href"] for a in soup.find_all("a",href=True) if re.search(r"func=(?!main|tacgia|favorite|register|search)", a["href"])]
+    print("  CAT LINKS", ls[:30])
+    for u in ls:
+        if "func=viewstory" in u or "func=story" in u or "id=" in u:
+            r2=get(requests.compat.urljoin(r.url,u)); 
+            if r2:
+                ch=analyze(r2, r"func=|id=", 20)
+                s2=BeautifulSoup(r2.text,"html.parser")
+                print("  STORY HTML SNIP", re.sub(r"\s+"," ",s2.get_text(" ",strip=True))[:1500])
+                cands=[x for x in ch if x!=r2.url and ("chap" in x.lower() or "chuong" in x.lower() or "page" in x.lower() or "viewstory" in x.lower())]
+                print("  CANDS", cands[:10])
+                if cands:
+                    r3=get(cands[0]); 
+                    if r3: analyze(r3, r"func=", 10)
+            break
