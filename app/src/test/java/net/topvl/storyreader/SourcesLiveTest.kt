@@ -2,6 +2,9 @@ package net.topvl.storyreader
 
 import kotlinx.coroutines.runBlocking
 import net.topvl.storyreader.source.GutenbergSource
+import net.topvl.storyreader.source.LmvnSource
+import net.topvl.storyreader.source.TieuThuyetSource
+import net.topvl.storyreader.source.TruyenCSource
 import net.topvl.storyreader.source.StorySource
 import net.topvl.storyreader.source.TruyenFullSource
 import net.topvl.storyreader.source.VietNamThuQuanSource
@@ -34,5 +37,8 @@ class SourcesLiveTest {
     @Test fun wattpad() = check(WattpadSource, "tình yêu")
     @Test fun truyenfull() = check(TruyenFullSource, "tien nghich")
     @Test fun vntq() = check(VietNamThuQuanSource, "tắt đèn")
+    @Test fun tieuthuyet() = check(TieuThuyetSource, "tình yêu")
+    @Test fun truyenc() = check(TruyenCSource, "cửu biện liên")
+    @Test fun lmvn() = check(LmvnSource, "tuyết sơn phi hồ")
     @Test fun gutenberg() = check(GutenbergSource, "sherlock")
 }

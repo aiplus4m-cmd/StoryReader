@@ -25,6 +25,9 @@ object Sources {
         WattpadSource,
         TruyenFullSource,
         VietNamThuQuanSource,
+        TieuThuyetSource,
+        TruyenCSource,
+        LmvnSource,
         GutenbergSource,
     )
 

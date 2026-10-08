@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,12 +41,6 @@ fun AboutScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth(0.8f).clip(RoundedCornerShape(12.dp)),
         )
         Spacer(Modifier.height(12.dp))
-        Image(
-            painterResource(R.drawable.app_icon),
-            contentDescription = "Biểu tượng ứng dụng",
-            modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)),
-        )
-        Spacer(Modifier.height(8.dp))
         Text("Nhảm StoryReader", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary)
         Text("Phiên bản ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall)

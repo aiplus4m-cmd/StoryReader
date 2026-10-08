@@ -93,3 +93,11 @@ fun String.absUrl(base: String): String = try {
 }
 
 fun String.urlEncode(): String = java.net.URLEncoder.encode(this, "UTF-8")
+
+/** Bỏ dấu tiếng Việt, chữ thường – dùng để so khớp từ khoá. */
+fun String.foldVi(): String =
+    java.text.Normalizer.normalize(lowercase(), java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{Mn}+"), "")
+        .replace('đ', 'd')
+        .replace(Regex("[^a-z0-9]+"), " ")
+        .trim()

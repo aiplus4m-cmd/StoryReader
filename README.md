@@ -1,6 +1,6 @@
 # Nhảm StoryReader
 
-<p align="center"><img src="app/src/main/res/drawable-nodpi/app_icon.png" width="160" alt="Nhảm StoryReader"> <img src="app/src/main/res/drawable-nodpi/logo_full.png" width="300" alt="NhảmStudio"></p>
+<p align="center"><img src="app/src/main/res/drawable-nodpi/logo_full.png" width="300" alt="NhảmStudio"></p>
 
 Ứng dụng Android tìm và đọc truyện từ các nguồn miễn phí, đọc theo kiểu **lật trang** như sách giấy.
 
@@ -24,6 +24,9 @@
 | Wattpad | https://www.wattpad.com | API công khai của Wattpad |
 | TruyenFull | https://truyenfull.live | Đọc trang HTML công khai |
 | Việt Nam Thư Quán | https://vietnamthuquan.eu | Đọc trang HTML công khai |
+| Tiểu Thuyết | https://tieuthuyet.vn | Đọc trang HTML công khai |
+| TruyenC | https://truyenc.com | Đọc trang HTML công khai; tìm theo danh mục truyện (sitemap) của trang. Có nội dung 18+ |
+| LMVN Truyện | https://lmvn.com/truyen | Đọc trang HTML công khai; tìm theo danh sách truyện của trang |
 | Project Gutenberg | https://www.gutenberg.org | Trang tìm kiếm & bản text công khai (sách phạm vi công cộng) |
 
 > VietMessenger (vietmessenger.net) hiện chỉ còn trang "coming soon", TàngThưViện không truy cập được và
