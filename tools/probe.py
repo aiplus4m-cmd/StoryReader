@@ -44,47 +44,32 @@ def analyze(r, linkpat=None, maxkeys=70):
     return []
 
 
-print("=================== TRUYENC JS")
-r=get("https://truyenc.com/static/js/main.min.js?v=0.0.7")
-if r:
-    print(re.findall(r'.{0,160}(?:search|keyword|tim-kiem|/api/|ajax|fetch\().{0,200}', r.text, re.I)[:20])
-r=get("https://truyenc.com/truyen/cuu-bien-lien-78")
+
+print("=================== TRUYENC SITEMAP")
+r=get("https://truyenc.com/robots.txt")
+if r: print(r.text[:800])
+for u in ["https://truyenc.com/sitemap.xml","https://truyenc.com/sitemap_index.xml","https://truyenc.com/sitemap-truyen.xml"]:
+    r=get(u)
+    if r: print(r.text[:1500])
+r=get("https://truyenc.com/tim-truyen-ma?page=2")
 if r:
     soup=BeautifulSoup(r.text,"html.parser")
-    print("  PAGINATION", [ (a.get("href"), a.get_text(strip=True)) for a in soup.select(".pagination a, #storyChapSidebar a, a[href*=page]")][:20])
-    sb=soup.select_one("#storyChapSidebar"); print("  SIDEBAR", str(sb)[:1500] if sb else None)
-    print("  INLINE", re.findall(r'.{0,120}(?:storyChap|loadChap|page=|chapters).{0,200}', r.text)[:12])
-    d=soup.select_one(".card.card-full-left .content"); print("  INFO HTML", re.sub(r"\s+"," ",str(d))[:2500] if d else None)
-r=get("https://truyenc.com/truyen/cuu-bien-lien/chuong-1-dan-truyen-2390")
-if r:
-    soup=BeautifulSoup(r.text,"html.parser"); c=soup.select_one(".story-content"); print("  CONTENT HTML", str(c)[:1200])
-    print("  TITLE", [x.get_text(" ",strip=True) for x in soup.select(".page-title, .card-style .content h1, .card-style .content h2, .card-style .content h3, .card-style .content h4")][:6])
+    for d in soup.select(".card.card-full-left .content .d-flex")[:2]: print("  ITEM", re.sub(r"\s+"," ",str(d))[:900])
+for u in ["https://truyenc.com/tim-kiem?tu-khoa=ma","https://truyenc.com/tim-kiem?s=ma","https://truyenc.com/?s=ma","https://truyenc.com/tim-truyen?q=ma"]:
+    r=get(u)
+    if r: print("   has-result-list:", len(re.findall(r'/truyen/[a-z0-9-]+-\d+"', r.text)), "title:", re.findall(r'page-title page-title-fixed.{0,200}', r.text)[:1])
 
 print("=================== LMVN")
-for u in ["https://lmvn.com/truyen/index.php?func=search&keyword=kim%20dung", "https://lmvn.com/truyen/index.php?func=search&keyword=tam%20quoc"]:
-    r=get(u)
-    if r:
-        ls=analyze(r, r"func=(?!main|tacgia|favorite|register)", 5)
-        soup=BeautifulSoup(r.text,"html.parser")
-        a=soup.find("a", href=re.compile(r"func=(view|story|doc|read)"))
-        if a: print("  RESULT CTX", re.sub(r"\s+"," ",str(a.find_parent("tr") or a.parent))[:1500])
-r=get("https://lmvn.com/truyen/index.php", method="POST", data={"func":"search","CODE":"0","keyword":"kim dung","searchin":"0"})
-if r: analyze(r, r"func=(?!main|tacgia|favorite|register)", 5)
-r=get("https://lmvn.com/truyen/index.php?func=main&cat=6")
+r=get("https://lmvn.com/truyen/index.php?func=main&a=T")
 if r:
     soup=BeautifulSoup(r.text,"html.parser")
-    ls=[a["href"] for a in soup.find_all("a",href=True) if re.search(r"func=(?!main|tacgia|favorite|register|search)", a["href"])]
-    print("  CAT LINKS", ls[:30])
-    for u in ls:
-        if "func=viewstory" in u or "func=story" in u or "id=" in u:
-            r2=get(requests.compat.urljoin(r.url,u)); 
-            if r2:
-                ch=analyze(r2, r"func=|id=", 20)
-                s2=BeautifulSoup(r2.text,"html.parser")
-                print("  STORY HTML SNIP", re.sub(r"\s+"," ",s2.get_text(" ",strip=True))[:1500])
-                cands=[x for x in ch if x!=r2.url and ("chap" in x.lower() or "chuong" in x.lower() or "page" in x.lower() or "viewstory" in x.lower())]
-                print("  CANDS", cands[:10])
-                if cands:
-                    r3=get(cands[0]); 
-                    if r3: analyze(r3, r"func=", 10)
-            break
+    a=soup.find("a", href=re.compile("func=viewpost"))
+    if a: print("  ROW", re.sub(r"\s+"," ",str(a.find_parent("table")))[:1500])
+    print("  PAGES", [x["href"] for x in soup.find_all("a",href=True) if "page=" in x["href"]][:20])
+    print("  COUNT viewpost", len(soup.find_all("a", href=re.compile("func=viewpost"))))
+r=get("https://lmvn.com/truyen/index.php?func=viewpost&id=LY3PznfY1FvcA4KZXZCRVapMUIb6aDGy")
+if r:
+    i=r.text.find("Hồi 1 tiếp"); print("  AROUND CHAPLIST", r.text[i-3000:i+1500])
+    print("  JS", re.findall(r'.{0,150}(?:ajax|xmlhttp|loadpage|viewpost|getpage|\.php\?).{0,200}', r.text, re.I)[:15])
+r=get("https://lmvn.com/truyen/jscripts/ajax.js")
+if r: print(r.text[:2500])
