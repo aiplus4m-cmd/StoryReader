@@ -1,0 +1,11 @@
+name: Probe sources
+on:
+  push:
+    branches: [ "ccr-*" ]
+    paths: [ ".github/workflows/probe.yml", "tools/**" ]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q beautifulsoup4 requests && python3 tools/probe.py
