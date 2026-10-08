@@ -158,7 +158,7 @@ fun SearchScreen(
             value = vm.query,
             onValueChange = { vm.query = it },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            placeholder = { Text("Tên truyện, @tác giả Wattpad, hoặc dán link…") },
+            placeholder = { Text("Tên truyện, @username Wattpad, hoặc dán link…") },
             leadingIcon = { Icon(Icons.Filled.Search, null) },
             trailingIcon = {
                 if (vm.query.isNotEmpty()) IconButton(onClick = { vm.query = "" }) { Icon(Icons.Filled.Clear, "Xoá") }
@@ -210,7 +210,7 @@ fun SearchScreen(
             EmptyState(
                 "Nhập từ khoá để tìm truyện trên ${enabledIds.size} nguồn.\nChạm vào tên nguồn để bật/tắt.\n\n" +
                     "Mẹo: dán link truyện hoặc link chương (ví dụ tìm được trên Google) để mở trực tiếp; " +
-                    "gõ @tên_tác_giả để xem truyện của tác giả trên Wattpad."
+                    "gõ @username (ví dụ @antinh28) để xem truyện của tác giả trên Wattpad."
             )
             return@Column
         }

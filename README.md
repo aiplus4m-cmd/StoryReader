@@ -9,7 +9,10 @@
 
 ## Tính năng
 
-- 🔎 **Tìm kiếm** đồng thời trên nhiều nguồn, bật/tắt từng nguồn.
+- 🔎 **Tìm kiếm** đồng thời trên nhiều nguồn, bật/tắt từng nguồn; truyện trùng tên được xếp lên đầu.
+- 🌐 **Tìm web**: tìm qua Google/Bing/DuckDuckGo trong phạm vi các nguồn đã chọn, chạm kết quả để mở thẳng trong app.
+- 🔗 Dán link truyện/chương (Wattpad, TruyenFull, VNTQ…) vào ô tìm kiếm để mở trực tiếp; `@username` để xem truyện của tác giả Wattpad.
+- 🔐 **Đăng nhập Wattpad** trong app để tìm & đọc truyện gắn nhãn Trưởng thành (Wattpad ẩn loại truyện này khi chưa đăng nhập).
 - ❤️ **Yêu thích (Tủ truyện)** và **lịch sử đọc** – tự lưu chương & vị trí đang đọc, "Đọc tiếp" một chạm.
 - 🔖 **Bookmark** tại bất kỳ trang nào (lưu theo vị trí ký tự nên không lệch khi đổi cỡ chữ).
 - 📖 **Đọc dạng lật trang**: vuốt hoặc chạm cạnh trái/phải để lật, hiệu ứng lật quanh gáy sách,
