@@ -31,26 +31,45 @@ print("SEED", [(s["title"], s.get("mature"), (s.get("language") or {}).get("id")
 
 
 
-APPF="stories(id,title,cover,description,user(name),numParts,url),total"
-V={
- "APP(limit20,offset0,appfields)": {"limit":20,"offset":0,"fields":APPF},
- "limit20,no-offset": {"limit":20,"fields":F},
- "limit20,offset0": {"limit":20,"offset":0,"fields":F},
- "limit50,no-offset": {"limit":50,"fields":F},
- "limit50,offset0": {"limit":50,"offset":0,"fields":F},
- "limit50,offset0,mature1": {"limit":50,"offset":0,"mature":"1","fields":F},
- "limit20,offset0,mature1": {"limit":20,"offset":0,"mature":"1","fields":F},
- "limit20,mature1,no-offset": {"limit":20,"mature":"1","fields":F},
- "web(limit20 mature true offset0)": {"limit":20,"offset":0,"mature":"true","fields":F},
-}
-score={k:0 for k in V}; tots={k:[] for k in V}
+
+def core(t):
+    t=re.sub(r"[\[\(][^\]\)]*[\]\)]"," ",t); t=re.split(r"\s[-–|]\s",t)[0]
+    return re.sub(r"\s+"," ",t).strip(" -:|,")
+def pos_of(q, sid, extra=None, limit=50):
+    p={"query":q,"limit":limit,"offset":0,"fields":F}
+    if extra: p.update(extra)
+    tot,st=ws(p,"x")
+    return next((i for i,x in enumerate(st) if x["id"]==sid),None), tot
+tests={"core":lambda t: core(t),"core-nodau":lambda t: fold(core(t)),"core-lower":lambda t: core(t).lower(),
+       "3 tu dau":lambda t:" ".join(core(t).split()[:3]),"bo 1 tu":lambda t:" ".join(core(t).split()[1:]) if len(core(t).split())>2 else core(t)}
+sc={k:[0,0] for k in tests}
 for sd in seed[:20]:
     row=[]
-    for k,p in V.items():
-        pp=dict(p); pp["query"]=sd["title"]
-        tot,st=ws(pp,k)
-        pos=next((i for i,x in enumerate(st) if x["id"]==sd["id"]),None)
-        if pos is not None: score[k]+=1
-        row.append(f"{pos}/{tot}")
-    print(f"- {sd['title'][:45]!r}: "+" | ".join(row))
-for k in V: print(f"SCORE {score[k]:2d}/20  {k}")
+    for k,f in tests.items():
+        q=f(sd["title"]); p,tot=pos_of(q,sd["id"])
+        if p is not None: sc[k][0]+=1
+        if p is not None and p<5: sc[k][1]+=1
+        row.append(f"{k}:{p}/{tot}")
+    print(f"- {sd['title'][:40]!r}: "+" | ".join(row))
+for k,(a,b) in sc.items(): print(f"SCORE {k}: trong top50={a}/20, top5={b}/20")
+
+# Mature: tìm truyện mature thật
+mat=[]
+for q in ["cao h","sắc","h văn","np","18+"]:
+    tot,st=ws({"query":q,"limit":50,"offset":0,"mature":"1","fields":F},"m")
+    mat+= [x for x in st if x.get("mature")]
+print("MATURE seeds", len(mat), [x["title"] for x in mat[:6]])
+ok_def=ok_m=0
+for x in mat[:10]:
+    a=pos_of(x["title"],x["id"]); b=pos_of(x["title"],x["id"],{"mature":"1"})
+    ok_def+= a[0] is not None; ok_m+= b[0] is not None
+    print("  MATURE", x["title"][:40], "default:",a, "mature=1:",b)
+print("MATURE found default", ok_def, "mature=1", ok_m)
+
+# Link chương (part) -> truyện
+if seed:
+    r=S.get(f"https://www.wattpad.com/api/v3/stories/{seed[0]['id']}?fields=parts(id,url)",timeout=20)
+    part=r.json()["parts"][2]
+    for u in [f"https://www.wattpad.com/api/v3/story_parts/{part['id']}?fields=id,groupId,title",
+              f"https://www.wattpad.com/v4/parts/{part['id']}?fields=id,group(id,title)"]:
+        r=S.get(u,timeout=20); print("PART", u, r.status_code, r.text[:300])
