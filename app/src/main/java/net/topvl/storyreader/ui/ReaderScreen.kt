@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -92,6 +93,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import net.topvl.storyreader.data.Bookmark
 import net.topvl.storyreader.data.Library
@@ -195,6 +197,8 @@ fun ReaderScreen(
     var showChapters by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     val progress = remember { Animatable(0f) }
+    var settleJob by remember { mutableStateOf<Job?>(null) }
+    var pendingDir by remember { mutableIntStateOf(0) }
 
     // Giữ màn hình sáng & ẩn thanh hệ thống khi đọc
     DisposableEffect(Unit) {
@@ -315,18 +319,38 @@ fun ReaderScreen(
             }
         }
 
+        // Lật trang: hướng được khoá ngay từ đầu cử chỉ để không bị lật ngược.
+        // pendingDir != 0 nghĩa là đang chạy hoạt ảnh lật, chưa chuyển trang.
+        fun finishPending() {
+            val job = settleJob
+            if (job != null && job.isActive) {
+                job.cancel()
+                if (pendingDir != 0) commit(pendingDir > 0)
+            }
+            pendingDir = 0
+            scope.launch { progress.snapTo(0f) }
+        }
+
+        fun settle(dir: Int, from: Float, accept: Boolean) {
+            val target = if (accept) dir.toFloat() else 0f
+            val remaining = kotlin.math.abs(target - from).coerceIn(0f, 1f)
+            pendingDir = if (accept) dir else 0
+            settleJob = scope.launch {
+                progress.animateTo(target, tween((60 + 220 * remaining).toInt()))
+                if (accept) commit(dir > 0)
+                pendingDir = 0
+                progress.snapTo(0f)
+            }
+        }
+
         fun flip(forward: Boolean) {
-            if (progress.isRunning) return
+            finishPending()
             if (forward && !canForward()) {
                 if (currentPages.isNotEmpty()) Toast.makeText(context, "Đã hết truyện", Toast.LENGTH_SHORT).show()
                 return
             }
             if (!forward && !canBackward()) return
-            scope.launch {
-                progress.animateTo(if (forward) 1f else -1f, tween(320))
-                commit(forward)
-                progress.snapTo(0f)
-            }
+            settle(if (forward) 1 else -1, 0f, true)
         }
 
         val pageModifier = Modifier
@@ -335,31 +359,58 @@ fun ReaderScreen(
                 detectTapGestures { pos ->
                     when {
                         showMenu -> showMenu = false
-                        pos.x < size.width * 0.3f -> flip(false)
-                        pos.x > size.width * 0.7f -> flip(true)
-                        else -> showMenu = true
+                        // Cạnh trái (25%): trang trước; giữa: menu; phần còn lại bên phải: trang sau
+                        pos.x < size.width * 0.25f -> flip(false)
+                        pos.x < size.width * 0.6f -> showMenu = true
+                        else -> flip(true)
                     }
                 }
             }
             .pointerInput(Unit) {
+                var dir = 0          // 1: tới, -1: lùi, 0: chưa xác định, 2: bị chặn
+                var accum = 0f
+                var last = 0f
+                val tracker = VelocityTracker()
+                val flingVelocity = 600.dp.toPx()  // px/giây
                 detectHorizontalDragGestures(
-                    onDragEnd = {
-                        scope.launch {
-                            val p = progress.value
-                            when {
-                                p > 0.2f -> { progress.animateTo(1f, tween(200)); commit(true); progress.snapTo(0f) }
-                                p < -0.2f -> { progress.animateTo(-1f, tween(200)); commit(false); progress.snapTo(0f) }
-                                else -> progress.animateTo(0f, tween(150))
-                            }
-                        }
+                    onDragStart = {
+                        finishPending()
+                        dir = 0; accum = 0f; last = 0f
+                        tracker.resetTracking()
                     },
-                    onDragCancel = { scope.launch { progress.animateTo(0f) } },
+                    onDragEnd = {
+                        if (dir == 1 || dir == -1) {
+                            val vx = tracker.calculateVelocity().x
+                            val accept = if (dir == 1) {
+                                vx < -flingVelocity || (last > 0.15f && vx < flingVelocity)
+                            } else {
+                                vx > flingVelocity || (last > 0.15f && vx > -flingVelocity)
+                            }
+                            settle(dir, last * dir, accept)
+                        }
+                        dir = 0
+                    },
+                    onDragCancel = {
+                        if (dir == 1 || dir == -1) settle(dir, last * dir, false)
+                        dir = 0
+                    },
                 ) { change, dragAmount ->
                     change.consume()
-                    var np = (progress.value - dragAmount / size.width).coerceIn(-1f, 1f)
-                    if (np > 0 && !canForward()) np = 0f
-                    if (np < 0 && !canBackward()) np = 0f
-                    scope.launch { progress.snapTo(np) }
+                    tracker.addPosition(change.uptimeMillis, change.position)
+                    accum += dragAmount
+                    if (dir == 0) {
+                        dir = when {
+                            accum < 0 -> if (canForward()) 1 else 2
+                            accum > 0 -> if (canBackward()) -1 else 2
+                            else -> 0
+                        }
+                    }
+                    if (dir == 1 || dir == -1) {
+                        // Chỉ trong một chiều: kéo ngược lại chỉ làm trang hạ về, không lật sang trang kia
+                        last = (-accum * dir / size.width).coerceIn(0f, 1f)
+                        val v = last * dir
+                        scope.launch { progress.snapTo(v) }
+                    }
                 }
             }
 
