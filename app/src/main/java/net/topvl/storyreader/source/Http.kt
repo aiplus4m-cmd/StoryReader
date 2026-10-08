@@ -66,8 +66,30 @@ private val BLOCK_TAGS = setOf(
     "p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr", "blockquote", "section", "article", "pre"
 )
 
-/** Chuyển một phần tử HTML thành văn bản thuần, giữ ngắt đoạn. */
+/** Dòng đánh dấu ảnh minh hoạ trong nội dung chương: IMAGE_MARK + url. */
+const val IMAGE_MARK = "[[IMG]]"
+
+private val AD_IMAGE = Regex(
+    """(?:^|[/_.\-?=&])(?:ads?|adskeeper|banners?|logo|emoji|smiley|icons?|loading|spinner|pixel|tracking|avatars?)(?:[/_.\-?=&]|\d|$)|\.svg(?:\?|$)""",
+    RegexOption.IGNORE_CASE,
+)
+
+/** Đường dẫn tuyệt đối của ảnh (hỗ trợ ảnh tải chậm data-src...), null nếu là ảnh quảng cáo/biểu tượng. */
+private fun Element.imageUrl(): String? {
+    val raw = listOf("data-original", "data-src", "data-lazy-src", "data-url", "src")
+        .map { absUrl(it).ifBlank { attr(it) } }
+        .firstOrNull { it.startsWith("http") } ?: return null
+    if (AD_IMAGE.containsMatchIn(raw)) return null
+    val w = attr("width").toIntOrNull()
+    val h = attr("height").toIntOrNull()
+    if ((w != null && w in 1..40) || (h != null && h in 1..40)) return null
+    return raw
+}
+
+/** Chuyển một phần tử HTML thành văn bản thuần, giữ ngắt đoạn và vị trí ảnh minh hoạ. */
 fun Element.toReadableText(): String {
+    // Lưu đường dẫn tuyệt đối trước khi clone (bản clone mất base URI)
+    select("img").forEach { img -> img.imageUrl()?.let { img.attr("data-abs-img", it) } }
     val el = clone()
     el.select("script, style, noscript, iframe, ins, button, form, [class*=ads], [id*=ads], .adsbygoogle").remove()
     val sb = StringBuilder()
@@ -75,8 +97,14 @@ fun Element.toReadableText(): String {
         override fun head(node: Node, depth: Int) {
             when (node) {
                 is TextNode -> sb.append(node.text())
-                is Element -> if (node.tagName() == "br") sb.append('\n')
-                    else if (node.tagName() in BLOCK_TAGS) sb.append('\n')
+                is Element -> when {
+                    node.tagName() == "img" -> {
+                        val url = node.attr("data-abs-img")
+                        if (url.isNotBlank()) sb.append('\n').append(IMAGE_MARK).append(url).append('\n')
+                    }
+                    node.tagName() == "br" -> sb.append('\n')
+                    node.tagName() in BLOCK_TAGS -> sb.append('\n')
+                }
             }
         }
 

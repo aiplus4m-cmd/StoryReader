@@ -94,6 +94,11 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.Job
+import net.topvl.storyreader.source.IMAGE_MARK
+import net.topvl.storyreader.source.Http
+import androidx.compose.ui.layout.ContentScale
+import coil.request.ImageRequest
+import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import net.topvl.storyreader.data.Bookmark
 import net.topvl.storyreader.data.Library
@@ -107,7 +112,7 @@ import net.topvl.storyreader.source.Story
 import net.topvl.storyreader.source.StoryDetail
 
 /** Một trang đã được dàn trang: [start, end) là vị trí trong chuỗi đầy đủ, bodyStart là vị trí trong nội dung chương. */
-private data class Page(val text: AnnotatedString, val start: Int, val end: Int, val bodyStart: Int)
+private data class Page(val text: AnnotatedString?, val bodyStart: Int, val image: String? = null)
 
 private data class Palette(val bg: Color, val fg: Color, val dim: Color)
 
@@ -119,37 +124,80 @@ private fun paletteOf(t: ReaderTheme) = when (t) {
 
 private const val INDENT = "  "
 
-private fun buildChapterText(content: ChapterContent, sourceName: String, s: ReaderSettings): Pair<AnnotatedString, Int> {
-    val body = content.text.ifBlank {
-        "(Chương này không có nội dung hoặc nội dung bị khoá. Hãy mở trang nguồn để đọc.)"
-    }
-    var headerLen = 0
-    val str = buildAnnotatedString {
+private fun header(content: ChapterContent, sourceName: String, s: ReaderSettings): AnnotatedString =
+    buildAnnotatedString {
         withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = (s.fontSize * 1.25f).sp)) { append(content.title) }
         append('\n')
         withStyle(SpanStyle(fontStyle = FontStyle.Italic, fontSize = (s.fontSize * 0.7f).sp)) {
             append("Nguồn: $sourceName")
         }
         append('\n')
-        headerLen = length
-        body.split('\n').forEachIndexed { i, para ->
-            if (i > 0) append('\n')
-            append(INDENT)
-            append(para)
-        }
     }
-    return str to headerLen
-}
 
-private fun paginate(
-    text: AnnotatedString,
-    headerLen: Int,
+/**
+ * Dàn trang một chương. Đoạn văn được chia trang theo kích thước màn hình; mỗi ảnh minh hoạ
+ * (dòng IMAGE_MARK) thành một trang riêng. Vị trí (bodyStart) tính theo chuỗi nội dung đã thụt đầu dòng.
+ */
+private fun buildPages(
+    content: ChapterContent,
+    sourceName: String,
+    settings: ReaderSettings,
     measurer: TextMeasurer,
     style: TextStyle,
     width: Int,
     height: Int,
 ): List<Page> {
     if (width <= 0 || height <= 0) return emptyList()
+    val body = content.text.ifBlank {
+        "(Chương này không có nội dung hoặc nội dung bị khoá. Hãy mở trang nguồn để đọc.)"
+    }
+    val pages = mutableListOf<Page>()
+    var headerPending = true
+    var offset = 0
+    var segStart = 0
+    val seg = StringBuilder()
+
+    fun flushText() {
+        if (seg.isEmpty()) return
+        var headerLen = 0
+        val str = buildAnnotatedString {
+            if (headerPending) append(header(content, sourceName, settings))
+            headerLen = length
+            append(seg.toString())
+        }
+        pages += paginate(str, headerLen, segStart, measurer, style, width, height)
+        headerPending = false
+        seg.setLength(0)
+    }
+
+    body.split('\n').forEach { line ->
+        if (line.startsWith(IMAGE_MARK)) {
+            flushText()
+            pages += Page(
+                text = if (headerPending) header(content, sourceName, settings) else null,
+                bodyStart = offset,
+                image = line.removePrefix(IMAGE_MARK).trim(),
+            )
+            headerPending = false
+        } else {
+            if (seg.isEmpty()) segStart = offset else seg.append('\n')
+            seg.append(INDENT).append(line)
+        }
+        offset += INDENT.length + line.length + 1
+    }
+    flushText()
+    return pages
+}
+
+private fun paginate(
+    text: AnnotatedString,
+    headerLen: Int,
+    base: Int,
+    measurer: TextMeasurer,
+    style: TextStyle,
+    width: Int,
+    height: Int,
+): List<Page> {
     val layout = measurer.measure(text, style, constraints = Constraints(maxWidth = width))
     val pages = mutableListOf<Page>()
     var startLine = 0
@@ -160,7 +208,7 @@ private fun paginate(
         val s = layout.getLineStart(startLine)
         val e = layout.getLineEnd(end)
         if (e > s) {
-            pages += Page(text.subSequence(s, e), s, e, (s - headerLen).coerceAtLeast(0))
+            pages += Page(text.subSequence(s, e), base + (s - headerLen).coerceAtLeast(0))
         }
         startLine = end + 1
     }
@@ -196,6 +244,7 @@ fun ReaderScreen(
     var showMenu by remember { mutableStateOf(false) }
     var showChapters by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var zoomImage by remember { mutableStateOf<String?>(null) }
     val progress = remember { Animatable(0f) }
     var settleJob by remember { mutableStateOf<Job?>(null) }
     var pendingDir by remember { mutableIntStateOf(0) }
@@ -267,8 +316,7 @@ fun ReaderScreen(
         val c = content
         val pages: List<Page> = remember(c, settings, textW, textH, palette) {
             if (c == null) emptyList() else {
-                val (str, headerLen) = buildChapterText(c, sourceName, settings)
-                paginate(str, headerLen, measurer, textStyle, textW, textH)
+                buildPages(c, sourceName, settings, measurer, textStyle, textW, textH)
             }
         }
         val currentPages by rememberUpdatedState(pages)
@@ -356,7 +404,10 @@ fun ReaderScreen(
         val pageModifier = Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                detectTapGestures { pos ->
+                detectTapGestures(
+                    // Chạm giữ trên trang ảnh: xem ảnh phóng to
+                    onLongPress = { currentPages.getOrNull(pageIndex)?.image?.let { zoomImage = it } },
+                ) { pos ->
                     when {
                         showMenu -> showMenu = false
                         // Cạnh trái (25%): trang trước; giữa: menu; phần còn lại bên phải: trang sau
@@ -424,7 +475,25 @@ fun ReaderScreen(
                     color = palette.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = hPad, end = hPad, top = topPad - 24.dp),
                 )
-                if (page != null) {
+                if (page != null && page.image != null) {
+                    Column(
+                        Modifier.fillMaxSize().padding(start = hPad, end = hPad, top = topPad, bottom = bottomPad),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        page.text?.let { Text(it, style = textStyle) }
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(page.image)
+                                .addHeader("User-Agent", Http.USER_AGENT)
+                                .addHeader("Referer", Sources.byId(story.sourceId)?.homepage ?: page.image)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Hình minh hoạ",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                        )
+                    }
+                } else if (page?.text != null) {
                     Text(
                         page.text,
                         style = textStyle,
@@ -517,7 +586,8 @@ fun ReaderScreen(
                             }.forEach { library.removeBookmark(it) }
                             Toast.makeText(context, "Đã bỏ bookmark", Toast.LENGTH_SHORT).show()
                         } else {
-                            val snippet = page.text.text.replace(INDENT, "").replace('\n', ' ').trim().take(100)
+                            val snippet = (page.text?.text?.replace(INDENT, "")?.replace('\n', ' ')?.trim()?.take(100))
+                                ?.takeIf { page.image == null } ?: "[Hình minh hoạ]"
                             library.addBookmark(
                                 Bookmark(
                                     fullStory, chapterIndex,
@@ -576,6 +646,10 @@ fun ReaderScreen(
                 }
             }
         }
+    }
+
+    zoomImage?.let { url ->
+        ImageZoomDialog(url, story.sourceId) { zoomImage = null }
     }
 
     if (showChapters) {
@@ -660,6 +734,43 @@ private fun ReaderSettingsPanel(s: ReaderSettings, onChange: (ReaderSettings) ->
             Text("Phông", modifier = Modifier.width(78.dp), style = MaterialTheme.typography.bodySmall)
             FilterChip(selected = s.serif, onClick = { onChange(s.copy(serif = true)) }, label = { Text("Có chân") })
             FilterChip(selected = !s.serif, onClick = { onChange(s.copy(serif = false)) }, label = { Text("Không chân") })
+        }
+    }
+}
+
+/** Xem ảnh minh hoạ toàn màn hình, chụm hai ngón để phóng to. */
+@Composable
+private fun ImageZoomDialog(url: String, sourceId: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            Modifier.fillMaxSize().background(Color.Black)
+                .pointerInput(Unit) {
+                    androidx.compose.foundation.gestures.detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(1f, 5f)
+                        offset = if (scale > 1f) offset + pan else androidx.compose.ui.geometry.Offset.Zero
+                    }
+                }
+                .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) },
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(context).data(url)
+                    .addHeader("User-Agent", Http.USER_AGENT)
+                    .addHeader("Referer", Sources.byId(sourceId)?.homepage ?: url)
+                    .build(),
+                contentDescription = "Hình minh hoạ",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = scale; scaleY = scale
+                    translationX = offset.x; translationY = offset.y
+                },
+            )
         }
     }
 }
